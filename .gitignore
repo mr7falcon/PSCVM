@@ -1,0 +1,16 @@
+.git
+.gitattributes
+*.sln
+*.vs
+*.csproj
+*.config
+x64
+VirtualMachine/Debug
+VirtualMachine/x64
+*.filters
+*.vcxproj
+*.user
+Environment/Compiler/Compiler/bin
+Environment/Compiler/Compiler/obj
+Environment/Debugger/x64
+Environment/Debugger/Debugger/x64

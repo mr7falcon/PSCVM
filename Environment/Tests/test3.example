@@ -1,0 +1,8 @@
+PUSH 24,59
+PUSH 4,12
+ADD
+PUSH 'str'
+PUSH 'ing'
+ADD
+PUSH {15|'arrstr'|89}
+HALT
