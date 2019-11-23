@@ -13,12 +13,15 @@ const string Variant::ToString() const
 	}
 	else if (usType == VarType::STR)
 	{
-		return (char*)pValue->p;
+		string str;
+		str.assign((char*)pValue->p, (char*)pValue->p + nLength + 1);
+		str[nLength] = '\0';
+		return str;
 	}
 	else if (usType == VarType::ARR)
 	{
 		string str = "";
-		for (Variant* p = (Variant*)pValue->p; p <= (Variant*)pValue->p + nLength; ++ p)
+		for (Variant* p = (Variant*)pValue->p; p < (Variant*)pValue->p + nLength; ++p)
 		{
 			str = str + p->ToString() + "|";
 		}
@@ -50,7 +53,7 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 		{
 			Variant* arr = pvm->HeapAlloc(var.nLength);
 
-			for (Variant* p = arr; p <= arr + var.nLength; ++p)
+			for (Variant* p = arr; p < arr + var.nLength; ++p)
 			{
 				*p = Variant::FromBytes(pc, pvm);
 			}
@@ -78,7 +81,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 
 		for (int i = 0; i < op1->nLength; ++i)
 		{
-			if (((char*)op1->pValue->p)[i] != ((char*)op2->pValue->p)[i])
+			if (((char*)op1->pValue->p + i) != ((char*)op2->pValue->p + i))
 			{
 				return false;
 			}

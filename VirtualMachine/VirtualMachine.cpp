@@ -23,7 +23,7 @@ inline void VirtualMachine::Resize()
 	Variant* sp = pStack + (m_sp - m_pStack + inc);
 	memcpy(sp, m_sp, (byte*)(m_pStack + m_nCapacity) - (byte*)m_sp);
 	m_sp = sp;
-	m_bp = pStack + (m_bp - m_pStack);
+	m_bp = m_bp >= m_pStack ? pStack + (m_bp - m_pStack) : pStack - 1;
 	delete[](m_pStack);
 	m_pStack = pStack;
 	m_nCapacity = m_nCapacity + inc;
@@ -51,7 +51,7 @@ void VirtualMachine::HeapCollect()
 	HeapChunk* pFirstChunk = m_pCurrentChunk = new HeapChunk;
 	m_pCurrentSlot = m_pCurrentChunk->vData;
 
-	for (Variant* sp = m_sp; sp <= m_pStack + m_nCapacity; ++sp)
+	for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
 	{
 		if (sp->usNull == Variant::c_null && sp->usType == VarType::ARR)
 		{
@@ -85,7 +85,7 @@ void VirtualMachine::HeapMove(Variant* from, Variant* to)
 		Variant* pArr = (Variant*)to->pValue->p;
 		Variant* iter = HeapAlloc(to->nLength);
 		to->pValue->p = (void*)iter;
-		for (Variant* p = pArr; p <= pArr + to->nLength; ++p, ++iter)
+		for (Variant* p = pArr; p < pArr + to->nLength; ++p, ++iter)
 		{
 			HeapMove(p, iter);
 		}
@@ -102,8 +102,8 @@ bool VirtualMachine::Run(byte* program)
 		{
 		case ByteCommand::CALL:
 		{
-			const int mark = *((int*)pc);
-			pc += sizeof(int);
+			const int mark = *((long*)pc);
+			pc += sizeof(long);
 			if (m_bp + 2 >= m_sp)
 			{
 				Resize();
@@ -114,7 +114,7 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::RET:
 		{
-			pc = program + (int)(m_bp--)->lValue;
+			pc = program + (long)(m_bp--)->lValue;
 		}
 		break;
 		case ByteCommand::FETCH:
@@ -124,12 +124,14 @@ bool VirtualMachine::Run(byte* program)
 				Resize();
 			}
 			*(--m_sp) = *(m_pStack + m_nCapacity - *((int*)pc));
+			m_sp->Copy();
 			pc += sizeof(int);
 		}
 		break;
 		case ByteCommand::STORE:
 		{
-			*(m_pStack + m_nCapacity - *((int*)pc)) = *(m_sp++);
+			*(m_pStack + m_nCapacity - *((int*)pc)) = *(m_sp);
+			(m_sp++)->Copy();
 			pc += sizeof(int);
 		}
 		break;
@@ -140,12 +142,14 @@ bool VirtualMachine::Run(byte* program)
 				Resize();
 			}
 			*(--m_sp) = *(m_bp - *((int*)pc));
+			m_sp->Copy();
 			pc += sizeof(int);
 		}
 		break;
 		case ByteCommand::LSTORE:
 		{
-			*(m_bp - *((int*)pc)) = *(m_sp++);
+			*(m_bp - *((int*)pc)) = *(m_sp);
+			(m_sp++)->Copy();
 			pc += sizeof(int);
 		}
 		break;
@@ -206,15 +210,14 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::INC:
 		{
-			++m_sp->dValue;
 			m_sp->Free();
-			break;
+			++m_sp->dValue;
 		}
 		break;
 		case ByteCommand::DEC:
 		{
-			--m_sp->dValue;
 			m_sp->Free();
+			--m_sp->dValue;
 		}
 		break;
 		case ByteCommand::MULT:
@@ -353,17 +356,17 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::JZ:
 		{
-			pc = (m_sp++)->dValue == 0.0 ? program + *((int*)pc) : pc + sizeof(int);
+			pc = (m_sp++)->dValue == 0.0 ? program + *((long*)pc) : pc + sizeof(long);
 		}
 		break;
 		case ByteCommand::JNZ:
 		{
-			pc = (m_sp++)->dValue != 0.0 ? program + *((int*)pc) : pc + sizeof(int);
+			pc = (m_sp++)->dValue != 0.0 ? program + *((long*)pc) : pc + sizeof(long);
 		}
 		break;
 		case ByteCommand::JMP:
 		{
-			pc = program + *((int*)pc);
+			pc = program + *((long*)pc);
 		}
 		break;
 		case ByteCommand::NONE:
@@ -391,7 +394,7 @@ const Variant* VirtualMachine::GetStack(int* size) const
 const string VirtualMachine::GetStack() const
 {
 	string sStack = "";
-	for (Variant* p = m_sp; p <= m_pStack + m_nCapacity; ++p)
+	for (Variant* p = m_sp; p < m_pStack + m_nCapacity; ++p)
 	{
 		sStack = sStack + p->ToString() + '\n';
 	}

@@ -1,8 +1,9 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 using System.Collections.Generic;
 
-namespace ExampleGenerator
+namespace Compiler
 {
     unsafe class Compiler
     {
@@ -42,31 +43,64 @@ namespace ExampleGenerator
             NONE
         };
 
+        public enum VarType : ushort
+        {
+            STR,
+            ARR
+        }
+
+        private const ushort c_null = 0x7FF0;
+
         private static List<byte> byteCode = new List<byte>();
 
         private static void AddVar(string op)
         {
-            byte[] bytes = new byte[sizeof(double)];
-            fixed (byte* p = bytes)
+            if (op[0] == '\'')
             {
-                *((double*)p) = double.Parse(op);
-            }
+                if (op[op.Length - 1] != '\'')
+                {
+                    throw new Exception("string ending error");
+                }
 
-            for (int i = 0; i < bytes.Length; ++i)
+                string sValue = op.Substring(1, op.Length - 1).Substring(0, op.Length - 2);
+                ushort usNull = c_null;
+                ushort usType = (ushort)VarType.STR;
+                int nLength = sValue.Length;
+                byteCode.AddRange(BitConverter.GetBytes(usNull));
+                byteCode.AddRange(BitConverter.GetBytes(usType));
+                byteCode.AddRange(BitConverter.GetBytes(nLength));
+                byteCode.AddRange(Encoding.ASCII.GetBytes(sValue));
+            }
+            else if (op[0] == '{')
             {
-                byteCode.Add(bytes[i]);
+                if (op[op.Length - 1] != '}')
+                {
+                    throw new Exception("list ending error");
+                }
+
+                string[] strVars = op.Substring(1, op.Length - 1).Substring(0, op.Length - 2).Split('|');
+
+                for (int i = 0; i < strVars.Length; ++i)
+                {
+                    AddVar(strVars[i]);
+                }
+            }
+            else
+            {
+                byteCode.AddRange(BitConverter.GetBytes(double.Parse(op)));
             }
         }
 
-        private static void AddOffset(string op)
+        private static void AddInt(string op)
         {
             int offset = int.Parse(op);
-            byte[] bytes = BitConverter.GetBytes(offset);
+            byteCode.AddRange(BitConverter.GetBytes(offset));
+        }
 
-            for (int i = 0; i < bytes.Length; ++i)
-            {
-                byteCode.Add(bytes[i]);
-            }
+        private static void AddLong(string op)
+        {
+            long offset = long.Parse(op);
+            byteCode.AddRange(BitConverter.GetBytes(offset));
         }
 
         static void Main(string[] args)
@@ -85,30 +119,30 @@ namespace ExampleGenerator
                 {
                     case "CALL":
                         byteCode.Add((byte)ByteCommand.CALL);
-                        AddOffset(words[i++]);
+                        AddLong(words[i++]);
                         break;
                     case "RET":
                         byteCode.Add((byte)ByteCommand.RET);
                         break;
                     case "FETCH":
                         byteCode.Add((byte)ByteCommand.FETCH);
-                        AddOffset(words[i++]);
+                        AddInt(words[i++]);
                         break;
                     case "STORE":
                         byteCode.Add((byte)ByteCommand.STORE);
-                        AddOffset(words[i++]);
+                        AddInt(words[i++]);
                         break;
                     case "LFETCH":
                         byteCode.Add((byte)ByteCommand.LFETCH);
-                        AddOffset(words[i++]);
+                        AddInt(words[i++]);
                         break;
                     case "LSTORE":
                         byteCode.Add((byte)ByteCommand.LSTORE);
-                        AddOffset(words[i++]);
+                        AddInt(words[i++]);
                         break;
                     case "LALLOC":
                         byteCode.Add((byte)ByteCommand.LALLOC);
-                        AddOffset(words[i++]);
+                        AddInt(words[i++]);
                         break;
                     case "LFREE":
                         byteCode.Add((byte)ByteCommand.LFREE);
@@ -170,15 +204,15 @@ namespace ExampleGenerator
                         break;
                     case "JZ":
                         byteCode.Add((byte)ByteCommand.JZ);
-                        AddOffset(words[i++]);
+                        AddLong(words[i++]);
                         break;
                     case "JNZ":
                         byteCode.Add((byte)ByteCommand.JNZ);
-                        AddOffset(words[i++]);
+                        AddLong(words[i++]);
                         break;
                     case "JMP":
                         byteCode.Add((byte)ByteCommand.JMP);
-                        AddOffset(words[i++]);
+                        AddLong(words[i++]);
                         break;
                     case "HALT":
                         byteCode.Add((byte)ByteCommand.HALT);

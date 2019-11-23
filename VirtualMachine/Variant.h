@@ -44,14 +44,6 @@ struct Variant
 		pValue = new SmartPtr(arr);
 	}
 
-	Variant(Variant& var)
-		: pValue(var.pValue),
-		  dValue(var.dValue)
-	{
-		if (pValue)
-			++pValue->rc;
-	}
-
 	~Variant();
 
 	inline void Free()
@@ -70,6 +62,14 @@ struct Variant
 			delete(pValue);
 			pValue = nullptr;
 			usNull = c_null;
+		}
+	}
+
+	inline void Copy()
+	{
+		if (pValue)
+		{
+			++pValue->rc;
 		}
 	}
 
