@@ -11,10 +11,19 @@ VirtualMachine::VirtualMachine()
 
 	m_pFirstChunk = m_pCurrentChunk = new HeapChunk;
 	m_pCurrentSlot = m_pCurrentChunk->vData;
+
+#ifdef _DEBUG
+	log.open("log.log");
+	//throw some exception if file did not opened
+#endif
 }
 
 inline void VirtualMachine::Resize()
 {
+#ifdef _DEBUG
+	Log("Resize " + std::to_string(m_nCapacity));
+#endif
+
 	HeapCollect(); //is there the best place for it?
 
 	const int inc = m_nCapacity >> 1;
@@ -104,6 +113,11 @@ bool VirtualMachine::Run(byte* program)
 		{
 			const int mark = *((long*)pc);
 			pc += sizeof(long);
+
+#ifdef _DEBUG
+			Log("CALL " + std::to_string(mark));
+#endif
+
 			if (m_bp + 2 >= m_sp)
 			{
 				Resize();
@@ -114,6 +128,10 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::RET:
 		{
+#ifdef _DEBUG
+			Log("RET");
+#endif
+
 			pc = program + (long)(m_bp--)->lValue;
 		}
 		break;
@@ -123,15 +141,24 @@ bool VirtualMachine::Run(byte* program)
 			{
 				Resize();
 			}
-			*(--m_sp) = *(m_pStack + m_nCapacity - *((int*)pc));
+			const int offset = *((int*)pc);
+
+#ifdef _DEBUG
+			Log("FETCH " + std::to_string(offset));
+#endif
+
+			*(--m_sp) = *(m_pStack + m_nCapacity - offset);
 			m_sp->Copy();
 			pc += sizeof(int);
 		}
 		break;
 		case ByteCommand::STORE:
 		{
-			*(m_pStack + m_nCapacity - *((int*)pc)) = *(m_sp);
-			(m_sp++)->Copy();
+#ifdef _DEBUG
+			Log("STORE " + m_sp->ToString());
+#endif
+
+			*(m_pStack + m_nCapacity - *((int*)pc)) = *(m_sp++);
 			pc += sizeof(int);
 		}
 		break;
@@ -141,15 +168,24 @@ bool VirtualMachine::Run(byte* program)
 			{
 				Resize();
 			}
-			*(--m_sp) = *(m_bp - *((int*)pc));
+			const int offset = *((int*)pc);
+
+#ifdef _DEBUG
+			Log("LFETCH " + std::to_string(offset));
+#endif
+
+			*(--m_sp) = *(m_bp - offset);
 			m_sp->Copy();
 			pc += sizeof(int);
 		}
 		break;
 		case ByteCommand::LSTORE:
 		{
-			*(m_bp - *((int*)pc)) = *(m_sp);
-			(m_sp++)->Copy();
+#ifdef _DEBUG
+			Log("LSTORE " + m_sp->ToString());
+#endif
+
+			*(m_bp - *((int*)pc)) = *(m_sp++);
 			pc += sizeof(int);
 		}
 		break;
@@ -157,6 +193,11 @@ bool VirtualMachine::Run(byte* program)
 		{
 			const int size = *((int*)pc);
 			pc += sizeof(int);
+
+#ifdef _DEBUG
+			Log("LALLOC " + std::to_string(size));
+#endif
+
 			while (m_bp + size + 1 >= m_sp)
 			{
 				Resize();
@@ -167,6 +208,10 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::LFREE:
 		{
+#ifdef _DEBUG
+			Log("LFREE ");
+#endif
+
 			Variant* bp = m_bp - 1 - (int)(m_bp--)->dValue;
 			while (m_bp > bp)
 			{
@@ -181,10 +226,18 @@ bool VirtualMachine::Run(byte* program)
 				Resize();
 			}
 			*(--m_sp) = Variant::FromBytes(&pc, this);
+
+#ifdef _DEBUG
+			Log("PUSH " + m_sp->ToString());
+#endif
 		}
 		break;
 		case ByteCommand::POP:
 		{
+#ifdef _DEBUG
+			Log("POP " + m_sp->ToString());
+#endif
+
 			(m_sp++)->Free();
 		}
 		break;
@@ -192,6 +245,10 @@ bool VirtualMachine::Run(byte* program)
 		{
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+			Log("ADD " + op1->ToString() + " " + op2->ToString());
+#endif
 
 			op1->Free();
 			op2->Free();
@@ -203,6 +260,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
 
+#ifdef _DEBUG
+			Log("SUB " + op1->ToString() + " " + op2->ToString());
+#endif
+
 			op1->Free();
 			op2->Free();
 			op1->dValue -= op2->dValue;
@@ -210,12 +271,20 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::INC:
 		{
+#ifdef _DEBUG
+			Log("INC " + m_sp->ToString());
+#endif
+
 			m_sp->Free();
 			++m_sp->dValue;
 		}
 		break;
 		case ByteCommand::DEC:
 		{
+#ifdef _DEBUG
+			Log("DEC " + m_sp->ToString());
+#endif
+
 			m_sp->Free();
 			--m_sp->dValue;
 		}
@@ -224,6 +293,10 @@ bool VirtualMachine::Run(byte* program)
 		{
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+			Log("MULT " + op1->ToString() + " " + op2->ToString());
+#endif
 
 			op1->Free();
 			op2->Free();
@@ -234,6 +307,10 @@ bool VirtualMachine::Run(byte* program)
 		{
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+			Log("DIV " + op1->ToString() + " " + op2->ToString());
+#endif
 
 			op1->Free();
 			op2->Free();
@@ -253,6 +330,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
 
+#ifdef _DEBUG
+			Log("MOD " + op1->ToString() + " " + op2->ToString());
+#endif
+
 			op1->Free();
 			op2->Free();
 
@@ -271,6 +352,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
 
+#ifdef _DEBUG
+			Log("AND " + op1->ToString() + " " + op2->ToString());
+#endif
+
 			op1->Free();
 			op2->Free();
 			op1->dValue = (op1->dValue != 0.0 && op2->dValue != 0.0
@@ -282,6 +367,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
 
+#ifdef _DEBUG
+			Log("OR " + op1->ToString() + " " + op2->ToString());
+#endif
+
 			op1->Free();
 			op2->Free();
 			op1->dValue = (op1->dValue != 0.0 && op1->usNull != Variant::c_null
@@ -290,6 +379,10 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::NOT:
 		{
+#ifdef _DEBUG
+			Log("NOT " + m_sp->ToString());
+#endif
+
 			m_sp->dValue = (m_sp->dValue == 0.0 || m_sp->usNull == Variant::c_null) ? 1.0 : 0.0;
 			m_sp->Free();
 		}
@@ -298,6 +391,10 @@ bool VirtualMachine::Run(byte* program)
 		{
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+			Log("LT " + op1->ToString() + " " + op2->ToString());
+#endif
 
 			op1->Free();
 			op2->Free();
@@ -309,6 +406,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
 
+#ifdef _DEBUG
+			Log("GT " + op1->ToString() + " " + op2->ToString());
+#endif
+
 			op1->Free();
 			op2->Free();
 			op1->dValue = op1->dValue > op2->dValue ? 1.0 : 0.0;
@@ -318,6 +419,10 @@ bool VirtualMachine::Run(byte* program)
 		{
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+			Log("LET " + op1->ToString() + " " + op2->ToString());
+#endif
 
 			op1->Free();
 			op2->Free();
@@ -329,6 +434,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
 
+#ifdef _DEBUG
+			Log("GET " + op1->ToString() + " " + op2->ToString());
+#endif
+
 			op1->Free();
 			op2->Free();
 			op1->dValue = op1->dValue >= op2->dValue ? 1.0 : 0.0;
@@ -338,6 +447,10 @@ bool VirtualMachine::Run(byte* program)
 		{
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+			Log("EQ " + op1->ToString() + " " + op2->ToString());
+#endif
 
 			op1->dValue = Variant::Equal(op1, op2) ? 1.0 : 0.0;
 			op1->Free();
@@ -349,6 +462,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* op2 = m_sp++;
 			Variant* op1 = m_sp;
 
+#ifdef _DEBUG
+			Log("NEQ " + op1->ToString() + " " + op2->ToString());
+#endif
+
 			op1->dValue = Variant::Equal(op1, op2) ? 0.0 : 1.0;
 			op1->Free();
 			op2->Free();
@@ -356,25 +473,69 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::JZ:
 		{
-			pc = (m_sp++)->dValue == 0.0 ? program + *((long*)pc) : pc + sizeof(long);
+			if ((m_sp++)->dValue == 0.0)
+			{
+				const long offset = *((long*)pc);
+				pc = program + offset;
+
+#ifdef _DEBUG
+				Log("JZ " + std::to_string(offset) + "TRUE");
+#endif
+			}
+			else
+			{
+				pc += sizeof(long);
+
+#ifdef _DEBUG
+				Log("JZ FALSE");
+#endif
+			}
 		}
 		break;
 		case ByteCommand::JNZ:
 		{
-			pc = (m_sp++)->dValue != 0.0 ? program + *((long*)pc) : pc + sizeof(long);
+			if ((m_sp++)->dValue != 0.0)
+			{
+				const long offset = *((long*)pc);
+				pc = program + offset;
+
+#ifdef _DEBUG
+				Log("JNZ " + std::to_string(offset) + "TRUE");
+#endif
+			}
+			else
+			{
+				pc += sizeof(long);
+
+#ifdef _DEBUG
+				Log("JZ FALSE");
+#endif
+			}
 		}
 		break;
 		case ByteCommand::JMP:
 		{
-			pc = program + *((long*)pc);
+			const long offset = *((long*)pc);
+			pc = program + offset;
+
+#ifdef _DEBUG
+			Log("JMP " + std::to_string(offset));
+#endif
 		}
 		break;
 		case ByteCommand::NONE:
 		{
+#ifdef _DEBUG
+			Log("NONE");
+#endif
 		}
 		break;
 		case ByteCommand::HALT:
 		{
+#ifdef _DEBUG
+			Log("HALT");
+#endif
+
 			return true;
 		}
 		default:

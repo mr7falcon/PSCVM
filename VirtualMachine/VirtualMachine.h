@@ -2,6 +2,11 @@
 
 #include "Variant.h"
 
+#ifdef _DEBUG
+#include <fstream>
+#endif
+
+
 enum ByteCommand : byte
 {
 	CALL,
@@ -71,4 +76,12 @@ private:
 	HeapChunk* m_pFirstChunk;
 	HeapChunk* m_pCurrentChunk;
 	Variant* m_pCurrentSlot;
+
+#ifdef _DEBUG
+	std::ofstream log;
+	inline void Log(const string messege)
+	{
+		log << messege << std::endl;
+	}
+#endif
 };

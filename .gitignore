@@ -16,3 +16,4 @@ Environment/Debugger/x64
 Environment/Debugger/Debugger/x64
 CLRVM/CLRVM/bin
 CLRVM/CLRVM/obj
+Environment/Debugger/Debugger/log.log
