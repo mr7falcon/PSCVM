@@ -1,0 +1,17 @@
+PUSH {'string' | 1,8 | 12}
+PUSH {-3 | 18 | 'arthur'}
+PUSH 70
+PUSH {{'morgan'} | 40 | 100}
+FETCH 1
+FETCH 2
+EQ
+FETCH 1
+PUSH {'string' | 1,8 | 12}
+EQ
+PUSH 77
+FETCH 3
+DEC
+STORE 3
+FETCH 3
+JNZ 190
+HALT

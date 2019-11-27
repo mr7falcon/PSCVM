@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Compiler
 {
-    unsafe class Compiler
+    class Compiler
     {
         public enum ByteCommand : byte
         {
@@ -53,54 +53,120 @@ namespace Compiler
 
         private static List<byte> byteCode = new List<byte>();
 
-        private static void AddVar(string op)
+        private static string program;
+        private static int i = 0;
+        
+        private static void ClearSpaces()
         {
-            if (op[0] == '\'')
+            while (program[i] == ' ' || program[i] == '\r' || program[i] == '\t' || program[i] == '\n')
             {
-                if (op[op.Length - 1] != '\'')
+                ++i;
+            }
+        }
+
+        private static string Split(params char[] separators)
+        {
+            string word = "";
+
+            if (separators.Length == 0)
+            {
+                separators = new char[4] { '\r', '\n', '\t', ' '};
+            }
+
+            while(true)
+            {
+                for (int j = 0; j < separators.Length; ++j)
                 {
-                    throw new Exception("string ending error");
+                    if (i == program.Length || program[i] == separators[j])
+                    {
+                        ++i;
+                        return word;
+                    }
                 }
 
-                string sValue = op.Substring(1, op.Length - 1).Substring(0, op.Length - 2);
+                word += program[i++];
+            }
+        }
+
+        private static byte[] AddVar()
+        {
+            ClearSpaces();
+
+            if (program[i] == '\'' || program[i] == '\"')
+            {
+                ++i;
+                string op = Split('\'', '\"');
+
                 ushort usNull = c_null;
                 ushort usType = (ushort)VarType.STR;
-                int nLength = sValue.Length;
-                byteCode.AddRange(BitConverter.GetBytes(usNull));
-                byteCode.AddRange(BitConverter.GetBytes(usType));
-                byteCode.AddRange(BitConverter.GetBytes(nLength));
-                byteCode.AddRange(Encoding.ASCII.GetBytes(sValue));
+                int nLength = op.Length;
+                List<byte> bytes = new List<byte>();
+                bytes.AddRange(BitConverter.GetBytes(usNull));
+                bytes.AddRange(BitConverter.GetBytes(usType));
+                bytes.AddRange(BitConverter.GetBytes(nLength));
+                bytes.AddRange(Encoding.ASCII.GetBytes(op));
+                return bytes.ToArray();
             }
-            else if (op[0] == '{')
+            else if (program[i] == '{')
             {
-                if (op[op.Length - 1] != '}')
+                ++i;
+                List<byte[]> varBytes = new List<byte[]>();
+                while (true)
                 {
-                    throw new Exception("list ending error");
+                    varBytes.Add(AddVar());
+
+                    ClearSpaces();
+                    char sym = program[i++];
+                    if (sym == '}')
+                    {
+                        break;
+                    }
+                    else if (sym != '|')
+                    {
+                        //some exceptopn
+                    }
                 }
 
-                string[] strVars = op.Substring(1, op.Length - 1).Substring(0, op.Length - 2).Split('|');
+                ushort usNull = c_null;
+                ushort usType = (ushort)VarType.STR;
+                int nLength = varBytes.Count;
+                List<byte> bytes = new List<byte>();
+                bytes.AddRange(BitConverter.GetBytes(usNull));
+                bytes.AddRange(BitConverter.GetBytes(usType));
+                bytes.AddRange(BitConverter.GetBytes(nLength));
 
-                for (int i = 0; i < strVars.Length; ++i)
+                for (int j = 0; j < nLength; ++j)
                 {
-                    AddVar(strVars[i]);
+                    bytes.AddRange(varBytes[j]);
                 }
+
+                return bytes.ToArray();
             }
             else
             {
-                byteCode.AddRange(BitConverter.GetBytes(double.Parse(op)));
+                string op = "";
+                while (Char.IsDigit(program[i]) || program[i] == ',' || program[i] == '-')
+                {
+                    op += program[i++];
+                }
+                return BitConverter.GetBytes(double.Parse(op));
             }
         }
 
-        private static void AddInt(string op)
+        private static byte[] AddInt()
         {
+            ClearSpaces();
+            string op = Split();
             int offset = int.Parse(op);
-            byteCode.AddRange(BitConverter.GetBytes(offset));
+            return BitConverter.GetBytes(offset);
         }
 
-        private static void AddLong(string op)
+        private static byte[] AddLong()
         {
+            ClearSpaces();
+            string op = Split();
             long offset = long.Parse(op);
-            byteCode.AddRange(BitConverter.GetBytes(offset));
+            return BitConverter.GetBytes(offset);
         }
 
         static void Main(string[] args)
@@ -110,46 +176,47 @@ namespace Compiler
                 throw new Exception("expected file name");
             }
 
-            string[] separators = { " ", "\n", "\r", "\t" };
-            string[] words = File.ReadAllText(args[0]).Split(separators, StringSplitOptions.RemoveEmptyEntries);
+            program = File.ReadAllText(args[0]);
 
-            for (int i = 0; i < words.Length;)
+            while (i < program.Length)
             {
-                switch (words[i++])
+                ClearSpaces();
+
+                switch (Split())
                 {
                     case "CALL":
                         byteCode.Add((byte)ByteCommand.CALL);
-                        AddLong(words[i++]);
+                        byteCode.AddRange(AddLong());
                         break;
                     case "RET":
                         byteCode.Add((byte)ByteCommand.RET);
                         break;
                     case "FETCH":
                         byteCode.Add((byte)ByteCommand.FETCH);
-                        AddInt(words[i++]);
+                        AddInt();
                         break;
                     case "STORE":
                         byteCode.Add((byte)ByteCommand.STORE);
-                        AddInt(words[i++]);
+                        AddInt();
                         break;
                     case "LFETCH":
                         byteCode.Add((byte)ByteCommand.LFETCH);
-                        AddInt(words[i++]);
+                        byteCode.AddRange(AddInt());
                         break;
                     case "LSTORE":
                         byteCode.Add((byte)ByteCommand.LSTORE);
-                        AddInt(words[i++]);
+                        byteCode.AddRange(AddInt());
                         break;
                     case "LALLOC":
                         byteCode.Add((byte)ByteCommand.LALLOC);
-                        AddInt(words[i++]);
+                        byteCode.AddRange(AddInt());
                         break;
                     case "LFREE":
                         byteCode.Add((byte)ByteCommand.LFREE);
                         break;
                     case "PUSH":
                         byteCode.Add((byte)ByteCommand.PUSH);
-                        AddVar(words[i++]);
+                        byteCode.AddRange(AddVar());
                         break;
                     case "POP":
                         byteCode.Add((byte)ByteCommand.POP);
@@ -204,15 +271,15 @@ namespace Compiler
                         break;
                     case "JZ":
                         byteCode.Add((byte)ByteCommand.JZ);
-                        AddLong(words[i++]);
+                        byteCode.AddRange(AddLong());
                         break;
                     case "JNZ":
                         byteCode.Add((byte)ByteCommand.JNZ);
-                        AddLong(words[i++]);
+                        byteCode.AddRange(AddLong());
                         break;
                     case "JMP":
                         byteCode.Add((byte)ByteCommand.JMP);
-                        AddLong(words[i++]);
+                        byteCode.AddRange(AddLong());
                         break;
                     case "HALT":
                         byteCode.Add((byte)ByteCommand.HALT);

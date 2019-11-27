@@ -271,6 +271,7 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::INC:
 		{
+			// think that whold be better to do something like that INC 4 (offset) instead fethches and stores
 #ifdef _DEBUG
 			Log("INC " + m_sp->ToString());
 #endif
