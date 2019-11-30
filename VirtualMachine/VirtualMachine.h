@@ -47,8 +47,9 @@ class VirtualMachine
 {
 public:
 	VirtualMachine();
+	~VirtualMachine();
 
-	inline Variant* HeapAlloc(const int count = 1);
+	inline Variant* HeapAlloc(const unsigned short count = 1);
 
 	bool Run(byte* program);
 
@@ -72,6 +73,8 @@ private:
 	{
 		HeapChunk* pNext = nullptr;
 		Variant vData[c_nChunkSize];
+
+		~HeapChunk();
 	};
 	HeapChunk* m_pFirstChunk;
 	HeapChunk* m_pCurrentChunk;

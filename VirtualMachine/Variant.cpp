@@ -13,18 +13,20 @@ const string Variant::ToString() const
 	}
 	else if (usType == VarType::STR)
 	{
-		string str;
-		str.assign((char*)pValue->p, (char*)pValue->p + nLength + 1);
-		str[nLength] = '\0';
+		string str = "\'";
+		str += (char*)pValue;
+		str[(size_t)usLength + 1] = '\'';
+		str.resize((size_t)usLength + 2);
 		return str;
 	}
 	else if (usType == VarType::ARR)
 	{
-		string str = "";
-		for (Variant* p = (Variant*)pValue->p; p < (Variant*)pValue->p + nLength; ++p)
+		string str = "{" + ((Variant*)pValue)->ToString();
+		for (Variant* p = (Variant*)pValue + 1; p < (Variant*)pValue + usLength; ++p)
 		{
-			str = str + p->ToString() + "|";
+			str = str + " | " + p->ToString();
 		}
+		str += '}';
 		return str;
 	}
 	else if (!pValue)
@@ -44,21 +46,21 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 	{
 		if (var.usType == VarType::STR)
 		{
-			char* str = new char[var.nLength];
-			memcpy(str, *pc, var.nLength);
-			*pc += var.nLength;
-			var.pValue = new SmartPtr(str);
+			char* str = new char[var.usLength];
+			memcpy(str, *pc, var.usLength);
+			*pc += var.usLength;
+			var.pValue = str;
 		}
 		else if (var.usType == VarType::ARR)
 		{
-			Variant* arr = pvm->HeapAlloc(var.nLength);
+			Variant* arr = pvm->HeapAlloc(var.usLength);
 
-			for (Variant* p = arr; p < arr + var.nLength; ++p)
+			for (Variant* p = arr; p < arr + var.usLength; ++p)
 			{
 				*p = Variant::FromBytes(pc, pvm);
 			}
 
-			var.pValue->p = new SmartPtr(arr);
+			var.pValue = arr;
 		}
 	}
 
@@ -74,14 +76,14 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	else if (op1->usType == VarType::STR && op2->usType == VarType::STR)
 	{
 
-		if (op1->nLength != op2->nLength)
+		if (op1->usLength != op2->usLength)
 		{
 			return false;
 		}
 
-		for (int i = 0; i < op1->nLength; ++i)
+		for (unsigned short i = 0; i < op1->usLength; ++i)
 		{
-			if (((char*)op1->pValue->p + i) != ((char*)op2->pValue->p + i))
+			if (((char*)op1->pValue + i) != ((char*)op2->pValue + i))
 			{
 				return false;
 			}
@@ -91,14 +93,14 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	}
 	else if (op1->usType == VarType::ARR && op2->usType == VarType::STR)
 	{
-		if (op1->nLength != op2->nLength)
+		if (op1->usLength != op2->usLength)
 		{
 			return false;
 		}
 
-		for (int i = 0; i < op1->nLength; ++i)
+		for (unsigned short i = 0; i < op1->usLength; ++i)
 		{
-			if (!Equal((Variant*)op1->pValue->p + i, (Variant*)op2->pValue->p + i))
+			if (!Equal((Variant*)op1->pValue + i, (Variant*)op2->pValue + i))
 			{
 				return false;
 			}

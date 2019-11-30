@@ -99,11 +99,12 @@ namespace Compiler
 
                 ushort usNull = c_null;
                 ushort usType = (ushort)VarType.STR;
-                int nLength = op.Length;
+                ushort usLength = (ushort)op.Length;
                 List<byte> bytes = new List<byte>();
                 bytes.AddRange(BitConverter.GetBytes(usNull));
                 bytes.AddRange(BitConverter.GetBytes(usType));
-                bytes.AddRange(BitConverter.GetBytes(nLength));
+                bytes.AddRange(BitConverter.GetBytes(usLength));
+                bytes.AddRange(BitConverter.GetBytes((ushort)1));
                 bytes.AddRange(Encoding.ASCII.GetBytes(op));
                 return bytes.ToArray();
             }
@@ -123,19 +124,20 @@ namespace Compiler
                     }
                     else if (sym != '|')
                     {
-                        //some exceptopn
+                        //any exceptopn
                     }
                 }
 
                 ushort usNull = c_null;
-                ushort usType = (ushort)VarType.STR;
-                int nLength = varBytes.Count;
+                ushort usType = (ushort)VarType.ARR;
+                ushort usLength = (ushort)varBytes.Count;
                 List<byte> bytes = new List<byte>();
                 bytes.AddRange(BitConverter.GetBytes(usNull));
                 bytes.AddRange(BitConverter.GetBytes(usType));
-                bytes.AddRange(BitConverter.GetBytes(nLength));
+                bytes.AddRange(BitConverter.GetBytes(usLength));
+                bytes.AddRange(BitConverter.GetBytes((ushort)1));
 
-                for (int j = 0; j < nLength; ++j)
+                for (int j = 0; j < usLength; ++j)
                 {
                     bytes.AddRange(varBytes[j]);
                 }
@@ -193,7 +195,7 @@ namespace Compiler
                         break;
                     case "FETCH":
                         byteCode.Add((byte)ByteCommand.FETCH);
-                        AddInt();
+                        byteCode.AddRange(AddInt());
                         break;
                     case "STORE":
                         byteCode.Add((byte)ByteCommand.STORE);
@@ -235,9 +237,11 @@ namespace Compiler
                         break;
                     case "INC":
                         byteCode.Add((byte)ByteCommand.INC);
+                        byteCode.AddRange(AddInt());
                         break;
                     case "DEC":
                         byteCode.Add((byte)ByteCommand.DEC);
+                        byteCode.AddRange(AddInt());
                         break;
                     case "MOD":
                         byteCode.Add((byte)ByteCommand.MOD);

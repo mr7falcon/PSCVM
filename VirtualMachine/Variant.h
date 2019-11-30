@@ -28,38 +28,33 @@ struct Variant
 		  dValue(val)
 	{}
 
-	Variant(char* str, const int length)
+	Variant(char* str, const unsigned short length)
 		: usNull(c_null),
 		  usType(VarType::STR),
-		  nLength(length)
-	{
-		pValue = new SmartPtr(str);
-	}
+		  usLength(length),
+		  usRef(1),
+		  pValue(str)
+	{}
 
-	Variant(Variant* arr, const int length)
+	Variant(Variant* arr, const unsigned short length)
 		: usNull(c_null),
 		  usType(VarType::ARR),
-		  nLength(length)
-	{
-		pValue = new SmartPtr(arr);
-	}
+		  usLength(length),
+		  usRef(1),
+		  pValue(arr)
+	{}
 
 	~Variant();
 
 	inline void Free()
 	{
-		if (pValue && --pValue->rc <= 0)
+		if (pValue && --usRef <= 0)
 		{
 			if (usType == VarType::STR)
 			{
-				delete[]((char*)pValue->p);
-			}
-			else if (usType == VarType::ARR)
-			{
-				delete[]((Variant*)pValue->p);
+				delete[]((char*)pValue);
 			}
 
-			delete(pValue);
 			pValue = nullptr;
 			usNull = c_null;
 		}
@@ -69,21 +64,8 @@ struct Variant
 	{
 		if (pValue)
 		{
-			++pValue->rc;
+			++usRef;
 		}
-	}
-
-	inline Variant operator[](const int pos)
-	{
-		if (usNull == c_null && usType == VarType::ARR)
-		{
-			if (pos < nLength)
-			{
-				return *((Variant*)pValue->p + pos);
-			}
-		}
-
-		return {};
 	}
 
 	static bool Equal(Variant* op1, Variant* op2);
@@ -100,18 +82,10 @@ struct Variant
 		{
 			unsigned short usNull;
 			unsigned short usType;
-			int nLength;
+			unsigned short usLength;
+			unsigned short usRef;
 		};
 	};
 
-	struct SmartPtr
-	{
-		SmartPtr(void* p)
-			: p(p),
-			  rc(1)
-		{}
-
-		void* p;
-		int rc;
-	} *pValue;
+	void* pValue;
 };

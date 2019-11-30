@@ -14,8 +14,28 @@ VirtualMachine::VirtualMachine()
 
 #ifdef _DEBUG
 	log.open("log.log");
-	//throw some exception if file did not opened
+	//throw any exception if file did not opened
 #endif
+}
+
+VirtualMachine::~VirtualMachine()
+{
+	for (Variant* iter = m_pStack; iter < m_pStack + m_nCapacity; ++iter)
+	{
+		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
+		{
+			delete[]((char*)iter->pValue);
+			iter->pValue = nullptr;
+		}
+	}
+
+	HeapChunk* iter = m_pFirstChunk;
+	while (iter)
+	{
+		HeapChunk* next = iter->pNext;
+		delete(iter);
+		iter = next;
+	}
 }
 
 inline void VirtualMachine::Resize()
@@ -24,7 +44,7 @@ inline void VirtualMachine::Resize()
 	Log("Resize " + std::to_string(m_nCapacity));
 #endif
 
-	HeapCollect(); //is there the best place for it?
+	HeapCollect(); //is here the best place for it?
 
 	const int inc = m_nCapacity >> 1;
 	Variant* pStack = new Variant[m_nCapacity + inc];
@@ -38,9 +58,9 @@ inline void VirtualMachine::Resize()
 	m_nCapacity = m_nCapacity + inc;
 }
 
-inline Variant* VirtualMachine::HeapAlloc(const int count)
+inline Variant* VirtualMachine::HeapAlloc(const unsigned short count)
 {
-	//throw some exception in case if count > c_nChunkSize
+	//throw any exception in case if count > c_nChunkSize
 
 	if (m_pCurrentSlot + count > m_pCurrentChunk->vData + c_nChunkSize)
 	{
@@ -64,10 +84,10 @@ void VirtualMachine::HeapCollect()
 	{
 		if (sp->usNull == Variant::c_null && sp->usType == VarType::ARR)
 		{
-			Variant* pArr = (Variant*)sp->pValue->p;
-			Variant* iter = HeapAlloc(sp->nLength);
-			sp->pValue->p = (void*)iter;
-			for (Variant* p = pArr; p <= pArr + sp->nLength; ++p, ++iter)
+			Variant* pArr = (Variant*)sp->pValue;
+			Variant* iter = HeapAlloc(sp->usLength);
+			sp->pValue = (void*)iter;
+			for (Variant* p = pArr; p <= pArr + sp->usLength; ++p, ++iter)
 			{
 				HeapMove(p, iter);
 			}
@@ -86,18 +106,27 @@ void VirtualMachine::HeapCollect()
 
 void VirtualMachine::HeapMove(Variant* from, Variant* to)
 {
+	from->Copy();
 	to->dValue = from->dValue;
 	to->pValue = from->pValue;
 
 	if (to->usNull == Variant::c_null && to->usType == VarType::ARR)
 	{
-		Variant* pArr = (Variant*)to->pValue->p;
-		Variant* iter = HeapAlloc(to->nLength);
-		to->pValue->p = (void*)iter;
-		for (Variant* p = pArr; p < pArr + to->nLength; ++p, ++iter)
+		Variant* pArr = (Variant*)to->pValue;
+		Variant* iter = HeapAlloc(to->usLength);
+		to->pValue = (void*)iter;
+		for (Variant* p = pArr; p < pArr + to->usLength; ++p, ++iter)
 		{
 			HeapMove(p, iter);
 		}
+	}
+}
+
+VirtualMachine::HeapChunk::~HeapChunk()
+{
+	for (Variant* iter = vData; iter < vData + c_nChunkSize; ++iter)
+	{
+		iter->Free();
 	}
 }
 
@@ -112,7 +141,7 @@ bool VirtualMachine::Run(byte* program)
 		case ByteCommand::CALL:
 		{
 			const int mark = *((long*)pc);
-			pc += sizeof(long);
+			pc += sizeof(long long);
 
 #ifdef _DEBUG
 			Log("CALL " + std::to_string(mark));
@@ -142,6 +171,7 @@ bool VirtualMachine::Run(byte* program)
 				Resize();
 			}
 			const int offset = *((int*)pc);
+			pc += sizeof(int);
 
 #ifdef _DEBUG
 			Log("FETCH " + std::to_string(offset));
@@ -149,7 +179,6 @@ bool VirtualMachine::Run(byte* program)
 
 			*(--m_sp) = *(m_pStack + m_nCapacity - offset);
 			m_sp->Copy();
-			pc += sizeof(int);
 		}
 		break;
 		case ByteCommand::STORE:
@@ -169,6 +198,7 @@ bool VirtualMachine::Run(byte* program)
 				Resize();
 			}
 			const int offset = *((int*)pc);
+			pc += sizeof(int);
 
 #ifdef _DEBUG
 			Log("LFETCH " + std::to_string(offset));
@@ -176,7 +206,6 @@ bool VirtualMachine::Run(byte* program)
 
 			*(--m_sp) = *(m_bp - offset);
 			m_sp->Copy();
-			pc += sizeof(int);
 		}
 		break;
 		case ByteCommand::LSTORE:
@@ -271,23 +300,30 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::INC:
 		{
-			// think that whold be better to do something like that INC 4 (offset) instead fethches and stores
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
 #ifdef _DEBUG
-			Log("INC " + m_sp->ToString());
+			Log("INC " + std::to_string(offset));
 #endif
 
-			m_sp->Free();
-			++m_sp->dValue;
+			Variant* var = (m_pStack + m_nCapacity - offset);
+			var->Free();
+			++var->dValue;
 		}
 		break;
 		case ByteCommand::DEC:
 		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
 #ifdef _DEBUG
-			Log("DEC " + m_sp->ToString());
+			Log("DEC " + std::to_string(offset));
 #endif
 
-			m_sp->Free();
-			--m_sp->dValue;
+			Variant* var = (m_pStack + m_nCapacity - offset);
+			var->Free();
+			--var->dValue;
 		}
 		break;
 		case ByteCommand::MULT:
@@ -453,9 +489,10 @@ bool VirtualMachine::Run(byte* program)
 			Log("EQ " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->dValue = Variant::Equal(op1, op2) ? 1.0 : 0.0;
+			const double bRes = Variant::Equal(op1, op2) ? 1.0 : 0.0;
 			op1->Free();
 			op2->Free();
+			op1->dValue = bRes;
 		}
 		break;
 		case ByteCommand::NEQ:
@@ -467,9 +504,10 @@ bool VirtualMachine::Run(byte* program)
 			Log("NEQ " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->dValue = Variant::Equal(op1, op2) ? 0.0 : 1.0;
+			const double bRes = Variant::Equal(op1, op2) ? 0.0 : 1.0;
 			op1->Free();
 			op2->Free();
+			op1->dValue = bRes;
 		}
 		break;
 		case ByteCommand::JZ:
@@ -480,12 +518,12 @@ bool VirtualMachine::Run(byte* program)
 				pc = program + offset;
 
 #ifdef _DEBUG
-				Log("JZ " + std::to_string(offset) + "TRUE");
+				Log("JZ " + std::to_string(offset) + " TRUE");
 #endif
 			}
 			else
 			{
-				pc += sizeof(long);
+				pc += sizeof(long long);
 
 #ifdef _DEBUG
 				Log("JZ FALSE");
@@ -501,15 +539,15 @@ bool VirtualMachine::Run(byte* program)
 				pc = program + offset;
 
 #ifdef _DEBUG
-				Log("JNZ " + std::to_string(offset) + "TRUE");
+				Log("JNZ " + std::to_string(offset) + " TRUE");
 #endif
 			}
 			else
 			{
-				pc += sizeof(long);
+				pc += sizeof(long long);
 
 #ifdef _DEBUG
-				Log("JZ FALSE");
+				Log("JNZ FALSE");
 #endif
 			}
 		}
