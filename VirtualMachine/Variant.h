@@ -12,6 +12,7 @@ enum VarType : unsigned short
 {
 	STR,
 	ARR,
+	DICT,
 };
 
 struct Variant
@@ -48,15 +49,15 @@ struct Variant
 
 	inline void Free()
 	{
-		if (pValue && --usRef <= 0)
+		if (pValue)
 		{
-			if (usType == VarType::STR)
+			if (usType == VarType::STR && --usRef <= 0)
 			{
 				delete[]((char*)pValue);
 			}
 
-			pValue = nullptr;
 			usNull = c_null;
+			pValue = nullptr;
 		}
 	}
 
@@ -66,6 +67,29 @@ struct Variant
 		{
 			++usRef;
 		}
+	}
+
+	inline Variant ArrGet(const unsigned short i)
+	{
+		if (usNull == c_null && usType == VarType::ARR && i < usLength)
+		{
+			Variant* var = (Variant*)pValue + i;
+			var->Copy();
+			return *var;
+		}
+		else
+		{
+			return Variant();
+		}
+	}
+
+	inline void ArrSet(const unsigned short i, Variant var)
+	{
+		if (usNull == c_null && usType == VarType::ARR && i < usLength)
+		{
+			*((Variant*)pValue + i) = var;
+		}
+		//else throw any exception
 	}
 
 	static bool Equal(Variant* op1, Variant* op2);

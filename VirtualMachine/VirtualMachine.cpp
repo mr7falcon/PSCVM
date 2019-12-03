@@ -82,7 +82,7 @@ void VirtualMachine::HeapCollect()
 
 	for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
 	{
-		if (sp->usNull == Variant::c_null && sp->usType == VarType::ARR)
+		if (sp->usNull == Variant::c_null && (sp->usType == VarType::ARR)
 		{
 			Variant* pArr = (Variant*)sp->pValue;
 			Variant* iter = HeapAlloc(sp->usLength);
@@ -183,12 +183,14 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::STORE:
 		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
 #ifdef _DEBUG
-			Log("STORE " + m_sp->ToString());
+			Log("STORE " + m_sp->ToString() + " " + std::to_string(offset));
 #endif
 
-			*(m_pStack + m_nCapacity - *((int*)pc)) = *(m_sp++);
-			pc += sizeof(int);
+			*(m_pStack + m_nCapacity - offset) = *(m_sp++);
 		}
 		break;
 		case ByteCommand::LFETCH:
@@ -210,12 +212,44 @@ bool VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::LSTORE:
 		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
 #ifdef _DEBUG
-			Log("LSTORE " + m_sp->ToString());
+			Log("LSTORE " + m_sp->ToString() + " " + std::to_string(offset));
 #endif
 
-			*(m_bp - *((int*)pc)) = *(m_sp++);
+			*(m_bp - offset) = *(m_sp++);
+		}
+		break;
+		case ByteCommand::AFETCH:
+		{
+			const int offset = *((int*)pc);
 			pc += sizeof(int);
+
+			m_sp->Free();
+			const unsigned short index = (unsigned short)m_sp->dValue;
+
+#ifdef _DEBUG
+			Log("AFETCH " + std::to_string(offset) + " " + std::to_string(index));
+#endif
+
+			*m_sp = (m_bp - offset)->ArrGet(index);
+		}
+		break;
+		case ByteCommand::ASTORE:
+		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
+			m_sp->Free();
+			const unsigned short index = (unsigned short)m_sp->dValue;
+
+#ifdef _DEBUG
+			Log("ASTORE " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
+#endif
+
+			(m_bp - offset)->ArrSet(index, *(m_sp++));
 		}
 		break;
 		case ByteCommand::LALLOC:
@@ -238,7 +272,7 @@ bool VirtualMachine::Run(byte* program)
 		case ByteCommand::LFREE:
 		{
 #ifdef _DEBUG
-			Log("LFREE ");
+			Log("LFREE");
 #endif
 
 			Variant* bp = m_bp - 1 - (int)(m_bp--)->dValue;
@@ -246,6 +280,20 @@ bool VirtualMachine::Run(byte* program)
 			{
 				(m_bp--)->Free();
 			}
+		}
+		break;
+		case ByteCommand::ARR:
+		{
+			m_sp->Free();
+			const unsigned short len = (unsigned short)m_sp->dValue;
+			//throw any exception if there's NaN;
+
+#ifdef _DEBUG
+			Log("ARR " + std::to_string(len));
+#endif
+
+			Variant* arr = HeapAlloc(len);
+			*m_sp = Variant(arr, len);
 		}
 		break;
 		case ByteCommand::PUSH:
