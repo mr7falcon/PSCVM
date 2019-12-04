@@ -69,7 +69,7 @@ struct Variant
 		}
 	}
 
-	inline Variant ArrGet(const unsigned short i)
+	inline Variant ArrGet(const unsigned short i) const
 	{
 		if (usNull == c_null && usType == VarType::ARR && i < usLength)
 		{
@@ -90,6 +90,18 @@ struct Variant
 			*((Variant*)pValue + i) = var;
 		}
 		//else throw any exception
+	}
+
+	struct HashNode
+	{
+		Variant* key;
+		Variant* val;
+		HashNode* prev;
+	};
+
+	inline const unsigned short GetHash() const
+	{
+
 	}
 
 	static bool Equal(Variant* op1, Variant* op2);

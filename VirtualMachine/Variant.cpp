@@ -21,10 +21,21 @@ const string Variant::ToString() const
 	}
 	else if (usType == VarType::ARR)
 	{
-		string str = "{" + ((Variant*)pValue)->ToString();
+		string str = '{' + ((Variant*)pValue)->ToString();
 		for (Variant* p = (Variant*)pValue + 1; p < (Variant*)pValue + usLength; ++p)
 		{
 			str = str + " | " + p->ToString();
+		}
+		str += '}';
+		return str;
+	}
+	else if (usType == VarType::DICT)
+	{
+		Variant* p = (Variant*)pValue;
+		string str = '{' + (p++)->ToString() + " : " + (p++)->ToString();
+		while (p < (Variant*)pValue + (usLength << 1))
+		{
+			str = str + " | " + (p++)->ToString() + " : " + (p++)->ToString();
 		}
 		str += '}';
 		return str;
@@ -62,6 +73,36 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 
 			var.pValue = arr;
 		}
+		else if (var.usType == VarType::DICT)
+		{
+			const unsigned short len = var.usLength << 1;
+			Variant* dict = pvm->HeapAlloc(len);
+			HashNode** hashTable = new HashNode*[var.usLength];
+
+			for (Variant *key = dict, *val = dict + 1; val < dict + len; key += 2, val += 2)
+			{
+				*key = Variant::FromBytes(pc, pvm);
+				*val = Variant::FromBytes(pc, pvm);
+
+				HashNode* node = new HashNode;
+				node->key = key;
+				node->val = val;
+				HashNode* cell = *(hashTable + key->GetHash());
+
+				if (cell)
+				{
+					node->prev = cell;
+				}
+				else
+				{
+					node->prev = nullptr;
+				}
+
+				cell = node;
+			}
+
+			var.pValue = hashTable;
+		}
 	}
 
 	return var;
@@ -91,7 +132,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 
 		return true;
 	}
-	else if (op1->usType == VarType::ARR && op2->usType == VarType::STR)
+	else if (op1->usType == VarType::ARR && op2->usType == VarType::ARR)
 	{
 		if (op1->usLength != op2->usLength)
 		{
@@ -99,6 +140,23 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 		}
 
 		for (unsigned short i = 0; i < op1->usLength; ++i)
+		{
+			if (!Equal((Variant*)op1->pValue + i, (Variant*)op2->pValue + i))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+	else if (op1->usType == VarType::DICT && op2->usType == VarType::DICT)
+	{
+		if (op1->usLength != op2->usLength)
+		{
+			return false;
+		}
+
+		for (unsigned short i = 0; i < (op1->usLength << 1); ++i)
 		{
 			if (!Equal((Variant*)op1->pValue + i, (Variant*)op2->pValue + i))
 			{
