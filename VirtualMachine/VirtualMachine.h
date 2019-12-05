@@ -39,10 +39,10 @@ enum ByteCommand : byte
 	JNZ,
 	JMP,
 	HALT,
-	ARR,
+	ARRAY,
 	ASTORE,
 	AFETCH,
-	DICT,
+	DICTIONARY,
 	DSTORE,
 	DFETCH,
 

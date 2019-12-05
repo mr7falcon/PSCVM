@@ -37,23 +37,38 @@ struct Variant
 		  pValue(str)
 	{}
 
-	Variant(Variant* arr, const unsigned short length)
+	Variant(Variant* var, const unsigned short length, const unsigned short type)
 		: usNull(c_null),
-		  usType(VarType::ARR),
+		  usType(type),
 		  usLength(length),
 		  usRef(1),
-		  pValue(arr)
+		  pValue(var)
 	{}
 
 	~Variant();
 
 	inline void Free()
 	{
-		if (pValue)
+		if (pValue && --usRef <= 0)
 		{
-			if (usType == VarType::STR && --usRef <= 0)
+			if (usType == VarType::STR)
 			{
 				delete[]((char*)pValue);
+			}
+			else if (usType == VarType::ARR)
+			{
+				for (Variant* p = (Variant*)pValue; p < (Variant*)pValue + usLength; ++p)
+				{
+					p->Free();
+				}
+			}
+			else if (usType == VarType::DICT)
+			{
+				const unsigned short len = usLength << 1;
+				for (Variant* p = (Variant*)pValue + 1; p < (Variant*)pValue + len; p += 2)
+				{
+					p->Free();
+				}
 			}
 
 			usNull = c_null;
@@ -71,33 +86,56 @@ struct Variant
 
 	inline Variant ArrGet(const unsigned short i) const
 	{
-		if (usNull == c_null && usType == VarType::ARR && i < usLength)
-		{
-			Variant* var = (Variant*)pValue + i;
-			var->Copy();
-			return *var;
-		}
-		else
-		{
-			return Variant();
-		}
+		Variant* var = (Variant*)pValue + i;
+		var->Copy();
+		return *var;
 	}
 
-	inline void ArrSet(const unsigned short i, Variant var)
+	inline void ArrSet(const unsigned short i, Variant* var)
 	{
-		if (usNull == c_null && usType == VarType::ARR && i < usLength)
-		{
-			*((Variant*)pValue + i) = var;
-		}
-		//else throw any exception
+		*((Variant*)pValue + i) = *var;
 	}
 
-	struct HashNode
+	inline Variant DictGet(Variant* key) const
 	{
-		Variant* key;
-		Variant* val;
-		HashNode* prev;
-	};
+		const unsigned short index = key->GetHash();
+		const unsigned short len = usLength << 1;
+
+		Variant* var = (Variant*)pValue + index;
+
+		while (!Equal(key, var))
+		{
+			var += 2;
+
+			if (var >= (Variant*)pValue + len)
+			{
+				var = (Variant*)pValue;
+			}
+		}
+
+		var->Copy();
+		return *var;
+	}
+
+	inline void DictSet(Variant* key, Variant* val)
+	{
+		const unsigned short index = key->GetHash();
+		const unsigned short len = usLength << 1;
+
+		Variant* cell = (Variant*)pValue + index;
+
+		while (!Equal(key, cell))
+		{
+			cell += 2;
+
+			if (cell >= (Variant*)pValue + len)
+			{
+				cell = (Variant*)pValue;
+			}
+		}
+
+		*(++cell) = *val;
+	}
 
 	inline const unsigned short GetHash() const
 	{

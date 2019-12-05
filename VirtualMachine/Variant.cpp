@@ -77,31 +77,27 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 		{
 			const unsigned short len = var.usLength << 1;
 			Variant* dict = pvm->HeapAlloc(len);
-			HashNode** hashTable = new HashNode*[var.usLength];
 
-			for (Variant *key = dict, *val = dict + 1; val < dict + len; key += 2, val += 2)
+			for (unsigned short i = 0; i < var.usLength; ++i)
 			{
-				*key = Variant::FromBytes(pc, pvm);
-				*val = Variant::FromBytes(pc, pvm);
+				Variant key = Variant::FromBytes(pc, pvm);
+				Variant* cell = dict + key.GetHash();
 
-				HashNode* node = new HashNode;
-				node->key = key;
-				node->val = val;
-				HashNode* cell = *(hashTable + key->GetHash());
+				while (!(cell->usNull == c_null && cell->pValue))
+				{
+					cell += 2;
 
-				if (cell)
-				{
-					node->prev = cell;
-				}
-				else
-				{
-					node->prev = nullptr;
+					if (cell >= dict + len)
+					{
+						cell = dict;
+					}
 				}
 
-				cell = node;
+				*cell = key;
+				*(++cell) = Variant::FromBytes(pc, pvm);
 			}
 
-			var.pValue = hashTable;
+			var.pValue = dict;
 		}
 	}
 

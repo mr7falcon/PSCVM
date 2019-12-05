@@ -82,14 +82,28 @@ void VirtualMachine::HeapCollect()
 
 	for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
 	{
-		if (sp->usNull == Variant::c_null && (sp->usType == VarType::ARR)
+		if (sp->usNull == Variant::c_null)
 		{
-			Variant* pArr = (Variant*)sp->pValue;
-			Variant* iter = HeapAlloc(sp->usLength);
-			sp->pValue = (void*)iter;
-			for (Variant* p = pArr; p <= pArr + sp->usLength; ++p, ++iter)
+			if (sp->usType == VarType::ARR)
 			{
-				HeapMove(p, iter);
+				Variant* pArr = (Variant*)sp->pValue;
+				Variant* iter = HeapAlloc(sp->usLength);
+				sp->pValue = (void*)iter;
+				for (Variant* p = pArr; p <= pArr + sp->usLength; ++p, ++iter)
+				{
+					HeapMove(p, iter);
+				}
+			}
+			else if (sp->usType == VarType::DICT)
+			{
+				Variant* pDict = (Variant*)sp->pValue;
+				const unsigned short len = sp->usLength << 1;
+				Variant* iter = HeapAlloc(len);
+				sp->pValue = iter;
+				for (Variant* p = pDict; p <= pDict + len; ++p, ++iter)
+				{
+					HeapMove(p, iter);
+				}
 			}
 		}
 	}
@@ -110,14 +124,28 @@ void VirtualMachine::HeapMove(Variant* from, Variant* to)
 	to->dValue = from->dValue;
 	to->pValue = from->pValue;
 
-	if (to->usNull == Variant::c_null && to->usType == VarType::ARR)
+	if (to->usNull == Variant::c_null)
 	{
-		Variant* pArr = (Variant*)to->pValue;
-		Variant* iter = HeapAlloc(to->usLength);
-		to->pValue = (void*)iter;
-		for (Variant* p = pArr; p < pArr + to->usLength; ++p, ++iter)
+		if (to->usType == VarType::ARR)
 		{
-			HeapMove(p, iter);
+			Variant* pArr = (Variant*)to->pValue;
+			Variant* iter = HeapAlloc(to->usLength);
+			to->pValue = (void*)iter;
+			for (Variant* p = pArr; p < pArr + to->usLength; ++p, ++iter)
+			{
+				HeapMove(p, iter);
+			}
+		}
+		else if (to->usType == VarType::DICT)
+		{
+			Variant* pDict = (Variant*)to->pValue;
+			const unsigned short len = to->usLength << 1;
+			Variant* iter = HeapAlloc(len);
+			to->pValue = iter;
+			for (Variant* p = pDict; p <= pDict + len; ++p, ++iter)
+			{
+				HeapMove(p, iter);
+			}
 		}
 	}
 }
@@ -222,6 +250,7 @@ bool VirtualMachine::Run(byte* program)
 			*(m_bp - offset) = *(m_sp++);
 		}
 		break;
+		//do we need to check a type for following commands?
 		case ByteCommand::AFETCH:
 		{
 			const int offset = *((int*)pc);
@@ -249,7 +278,36 @@ bool VirtualMachine::Run(byte* program)
 			Log("ASTORE " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
 #endif
 
-			(m_bp - offset)->ArrSet(index, *(m_sp++));
+			(m_bp - offset)->ArrSet(index, m_sp++);
+		}
+		break;
+		case ByteCommand::DFETCH:
+		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
+#ifdef _DEBUG
+			Log("DFETCH " + std::to_string(offset) + " " + m_sp->ToString());
+#endif
+
+			Variant val = (m_bp - offset)->DictGet(m_sp);
+			m_sp->Free();
+			*m_sp = val;
+		}
+		break;
+		case ByteCommand::DSTORE:
+		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
+			Variant* key = m_sp;
+
+#ifdef _DEBUG
+			Log("DSTORE " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+#endif
+
+			(m_bp - offset)->DictSet(key, m_sp++);
+			key->Free();
 		}
 		break;
 		case ByteCommand::LALLOC:
@@ -282,7 +340,7 @@ bool VirtualMachine::Run(byte* program)
 			}
 		}
 		break;
-		case ByteCommand::ARR:
+		case ByteCommand::ARRAY:
 		{
 			m_sp->Free();
 			const unsigned short len = (unsigned short)m_sp->dValue;
@@ -293,7 +351,20 @@ bool VirtualMachine::Run(byte* program)
 #endif
 
 			Variant* arr = HeapAlloc(len);
-			*m_sp = Variant(arr, len);
+			*m_sp = Variant(arr, len, VarType::ARR);
+		}
+		case ByteCommand::DICTIONARY:
+		{
+			m_sp->Free();
+			const unsigned short len = (unsigned short)m_sp->dValue;
+			//throw any exception if there's NaN;
+
+#ifdef _DEBUG
+			Log("DICT " + std::to_string(len));
+#endif
+
+			Variant* arr = HeapAlloc(len << 1);
+			*m_sp = Variant(arr, len, VarType::DICT);
 		}
 		break;
 		case ByteCommand::PUSH:
