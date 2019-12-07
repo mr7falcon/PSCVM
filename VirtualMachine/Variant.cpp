@@ -33,7 +33,8 @@ const string Variant::ToString() const
 	{
 		Variant* p = (Variant*)pValue;
 		string str = '{' + (p++)->ToString() + " : " + (p++)->ToString();
-		while (p < (Variant*)pValue + (usLength << 1))
+		const unsigned int len = usLength << 1;
+		while (p < (Variant*)pValue + len)
 		{
 			str = str + " | " + (p++)->ToString() + " : " + (p++)->ToString();
 		}
@@ -64,7 +65,9 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 		}
 		else if (var.usType == VarType::ARR)
 		{
-			Variant* arr = pvm->HeapAlloc(var.usLength);
+			const unsigned short capacity = var.usLength + (var.usLength >> c_capInc);
+			Variant* arr = pvm->HeapAlloc(capacity + 1);
+			*(arr++) = Variant(capacity);
 
 			for (Variant* p = arr; p < arr + var.usLength; ++p)
 			{
@@ -75,19 +78,21 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 		}
 		else if (var.usType == VarType::DICT)
 		{
-			const unsigned short len = var.usLength << 1;
-			Variant* dict = pvm->HeapAlloc(len);
+			const unsigned int len = var.usLength << 1;
+			const unsigned int capacity = len + (len >> c_capInc);
+			Variant* dict = pvm->HeapAlloc(capacity + 1);
+			*(dict++) = Variant(capacity);
 
 			for (unsigned short i = 0; i < var.usLength; ++i)
 			{
 				Variant key = Variant::FromBytes(pc, pvm);
-				Variant* cell = dict + key.GetHash();
+				Variant* cell = dict + key.GetHash(capacity);
 
 				while (!(cell->usNull == c_null && cell->pValue))
 				{
 					cell += 2;
 
-					if (cell >= dict + len)
+					if (cell >= dict + capacity)
 					{
 						cell = dict;
 					}
@@ -152,7 +157,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			return false;
 		}
 
-		for (unsigned short i = 0; i < (op1->usLength << 1); ++i)
+		for (unsigned int i = 0; i < ((unsigned int)op1->usLength << 1); ++i)
 		{
 			if (!Equal((Variant*)op1->pValue + i, (Variant*)op2->pValue + i))
 			{

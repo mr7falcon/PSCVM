@@ -42,9 +42,11 @@ enum ByteCommand : byte
 	ARRAY,
 	ASTORE,
 	AFETCH,
+	APUSH,
 	DICTIONARY,
 	DSTORE,
 	DFETCH,
+	DINSERT,
 
 	NONE
 };
@@ -56,6 +58,7 @@ public:
 	~VirtualMachine();
 
 	inline Variant* HeapAlloc(const unsigned short count = 1);
+	inline void HeapChangeRefs(Variant* from, Variant* to);
 
 	bool Run(byte* program);
 
@@ -64,11 +67,13 @@ public:
 
 private:
 	static const int c_nChunkSize = 64;
+	static const unsigned short c_bReplaced = 0x7FF1;
 
 	inline void Resize();
 
 	void HeapCollect();
 	void HeapMove(Variant* from, Variant* to);
+	void HeapChangeRefs(Variant* var, Variant* from, Variant* to);
 
 	Variant* m_pStack;
 	int m_nCapacity;

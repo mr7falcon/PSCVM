@@ -18,6 +18,7 @@ enum VarType : unsigned short
 struct Variant
 {
 	static const unsigned short c_null = 0x7FF0;
+	static const char c_capInc = 2;
 
 	Variant()
 		: pValue(nullptr),
@@ -64,8 +65,8 @@ struct Variant
 			}
 			else if (usType == VarType::DICT)
 			{
-				const unsigned short len = usLength << 1;
-				for (Variant* p = (Variant*)pValue + 1; p < (Variant*)pValue + len; p += 2)
+				const unsigned int len = usLength << 1;
+				for (Variant* p = (Variant*)pValue; p < (Variant*)pValue + len; ++p)
 				{
 					p->Free();
 				}
@@ -96,31 +97,28 @@ struct Variant
 		*((Variant*)pValue + i) = *var;
 	}
 
-	inline Variant DictGet(Variant* key) const
+	inline void PushBack(Variant* var, VirtualMachine* pvm)
 	{
-		const unsigned short index = key->GetHash();
-		const unsigned short len = usLength << 1;
-
-		Variant* var = (Variant*)pValue + index;
-
-		while (!Equal(key, var))
+		++usLength;
+		const unsigned short capacity = (unsigned short)((Variant*)pValue - 1)->dValue;
+		if (usLength > capacity)
 		{
-			var += 2;
-
-			if (var >= (Variant*)pValue + len)
-			{
-				var = (Variant*)pValue;
-			}
+			const unsigned short newCapacity = capacity >> c_capInc;
+			Variant* pArr = (Variant*)pValue;
+			Variant* iter = pvm->HeapAlloc(newCapacity + 1);
+			*(iter++) = Variant(newCapacity);
+			memcpy(iter, pArr, sizeof(Variant) * capacity);
+			pvm->HeapChangeRefs(pArr, iter);
 		}
 
-		var->Copy();
-		return *var;
+		*((Variant*)pValue + usLength - 1) = *var;
 	}
 
-	inline void DictSet(Variant* key, Variant* val)
+	inline Variant DictGet(Variant* key) const
 	{
-		const unsigned short index = key->GetHash();
-		const unsigned short len = usLength << 1;
+		const unsigned int capacity = (unsigned int)((Variant*)pValue - 1)->dValue;
+		const unsigned int index = key->GetHash(capacity) << 1;
+		const unsigned int len = usLength << 1;
 
 		Variant* cell = (Variant*)pValue + index;
 
@@ -128,7 +126,39 @@ struct Variant
 		{
 			cell += 2;
 
-			if (cell >= (Variant*)pValue + len)
+			if (cell->usNull == c_null && cell->pValue)
+			{
+				//key is missing, throw any exception
+			}
+
+			if (cell >= (Variant*)pValue + capacity)
+			{
+				cell = (Variant*)pValue;
+			}
+		}
+
+		(++cell)->Copy();
+		return *cell;
+	}
+
+	inline void DictSet(Variant* key, Variant* val)
+	{
+		const unsigned int capacity = (unsigned int)((Variant*)pValue - 1)->dValue;
+		const unsigned int index = key->GetHash(capacity) << 1;
+		const unsigned int len = usLength << 1;
+
+		Variant* cell = (Variant*)pValue + index;
+
+		while (!Equal(key, cell))
+		{
+			cell += 2;
+
+			if (cell->usNull == c_null && cell->pValue)
+			{
+				//key is missing, throw any exception
+			}
+
+			if (cell >= (Variant*)pValue + capacity)
 			{
 				cell = (Variant*)pValue;
 			}
@@ -137,9 +167,54 @@ struct Variant
 		*(++cell) = *val;
 	}
 
-	inline const unsigned short GetHash() const
+	inline void Insert(Variant* key, Variant* val)
 	{
+		++usLength;
+		const unsigned int len = usLength << 1;
+		const unsigned int capacity = (unsigned int)((Variant*)pValue - 1)->dValue;
+		if (len > capacity)
+		{
+			//throw any exception, i think
+		}
 
+		const unsigned int index = key->GetHash(capacity) << 1;
+		Variant* cell = (Variant*)pValue + index;
+
+		while (!(cell->usNull == c_null && cell->pValue))
+		{
+			cell += 2;
+
+			if (cell >= (Variant*)pValue + capacity)
+			{
+				cell = (Variant*)pValue;
+			}
+		}
+	}
+
+	inline const unsigned short GetHash(const unsigned int cap) const
+	{
+		long res = lValue;
+
+		if (usNull == c_null)
+		{
+			if (usType == VarType::STR)
+			{
+				for (char* c = (char*)pValue; c < (char*)pValue + usLength; ++c)
+				{
+					res -= *c;
+				}
+			}
+			else if (usType == VarType::ARR)
+			{
+				//ToDo
+			}
+			else if (usType == VarType::DICT)
+			{
+				//ToDo
+			}
+		}
+
+		return (const unsigned short)(res % cap);
 	}
 
 	static bool Equal(Variant* op1, Variant* op2);
