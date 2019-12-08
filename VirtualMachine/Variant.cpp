@@ -49,7 +49,7 @@ const string Variant::ToString() const
 	return "";
 }
 
-Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
+Variant Variant::FromBytes(byte** pc)
 {
 	Variant var(*((double*)*pc));
 	*pc += sizeof(double);
@@ -66,12 +66,12 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 		else if (var.usType == VarType::ARR)
 		{
 			const unsigned short capacity = var.usLength + (var.usLength >> c_capInc);
-			Variant* arr = pvm->HeapAlloc(capacity + 1);
+			Variant* arr = VirtualMachine::HeapAlloc(capacity + 1);
 			*(arr++) = Variant(capacity);
 
 			for (Variant* p = arr; p < arr + var.usLength; ++p)
 			{
-				*p = Variant::FromBytes(pc, pvm);
+				*p = Variant::FromBytes(pc);
 			}
 
 			var.pValue = arr;
@@ -80,12 +80,12 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 		{
 			const unsigned int len = var.usLength << 1;
 			const unsigned int capacity = len + (len >> c_capInc);
-			Variant* dict = pvm->HeapAlloc(capacity + 1);
+			Variant* dict = VirtualMachine::HeapAlloc(capacity + 1);
 			*(dict++) = Variant(capacity);
 
 			for (unsigned short i = 0; i < var.usLength; ++i)
 			{
-				Variant key = Variant::FromBytes(pc, pvm);
+				Variant key = Variant::FromBytes(pc);
 				Variant* cell = dict + key.GetHash(capacity);
 
 				while (!(cell->usNull == c_null && cell->pValue))
@@ -99,7 +99,7 @@ Variant Variant::FromBytes(byte** pc, VirtualMachine* pvm)
 				}
 
 				*cell = key;
-				*(++cell) = Variant::FromBytes(pc, pvm);
+				*(++cell) = Variant::FromBytes(pc);
 			}
 
 			var.pValue = dict;
@@ -171,4 +171,21 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	{
 		return false;
 	}
+}
+
+void Variant::PushBack(Variant* var)
+{
+	++usLength;
+	const unsigned short capacity = (unsigned short)((Variant*)pValue - 1)->dValue;
+	if (usLength > capacity)
+	{
+		const unsigned short newCapacity = capacity >> c_capInc;
+		Variant* pArr = (Variant*)pValue;
+		Variant* iter = VirtualMachine::HeapAlloc(newCapacity + 1);
+		*(iter++) = Variant(newCapacity);
+		memcpy(iter, pArr, sizeof(Variant) * capacity);
+		VirtualMachine::HeapChangeRefs(pArr, iter);
+	}
+
+	*((Variant*)pValue + usLength - 1) = *var;
 }

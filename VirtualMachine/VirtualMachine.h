@@ -54,31 +54,55 @@ enum ByteCommand : byte
 class VirtualMachine
 {
 public:
-	VirtualMachine();
-	~VirtualMachine();
+	static inline void Initialize();
+	static inline void ShutDown();
 
-	inline Variant* HeapAlloc(const unsigned short count = 1);
-	inline void HeapChangeRefs(Variant* from, Variant* to);
+	static inline Variant* HeapAlloc(const unsigned short count = 1)
+	{
+		//throw any exception in case if count > c_nChunkSize
 
-	bool Run(byte* program);
+		if (m_pCurrentSlot + count > m_pCurrentChunk->vData + c_nChunkSize)
+		{
+			m_pCurrentChunk->pNext = new HeapChunk;
+			m_pCurrentChunk = m_pCurrentChunk->pNext;
+			m_pCurrentSlot = m_pCurrentChunk->vData;
+		}
 
-	const string GetStack() const;
-	const Variant* GetStack(int* size) const;
+		Variant* p = m_pCurrentSlot;
+		m_pCurrentSlot = m_pCurrentSlot + count + 1;
+
+		return p;
+	}
+
+	static inline void HeapChangeRefs(Variant* from, Variant* to)
+	{
+		for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
+		{
+			HeapChangeRefs(sp, from, to);
+		}
+	}
+
+	static inline bool Run(byte* program);
+
+	static inline const string GetStack();
+	static inline const Variant* GetStack(int* size);
 
 private:
+	VirtualMachine();
+
 	static const int c_nChunkSize = 64;
 	static const unsigned short c_bReplaced = 0x7FF1;
 
-	inline void Resize();
+	static inline void Resize();
 
-	void HeapCollect();
-	void HeapMove(Variant* from, Variant* to);
-	void HeapChangeRefs(Variant* var, Variant* from, Variant* to);
+	static inline void HeapCollect();
+	static void HeapMove(Variant* from, Variant* to);
+	static void HeapChangeRefs(Variant* var, Variant* from, Variant* to);
 
-	Variant* m_pStack;
-	int m_nCapacity;
-	Variant* m_sp;
-	Variant* m_bp;
+	static Variant* m_pStack;
+	static int m_nCapacity;
+	static Variant* m_sp;
+	static Variant* m_bp;
 
 	struct HeapChunk
 	{
@@ -87,13 +111,13 @@ private:
 
 		~HeapChunk();
 	};
-	HeapChunk* m_pFirstChunk;
-	HeapChunk* m_pCurrentChunk;
-	Variant* m_pCurrentSlot;
+	static HeapChunk* m_pFirstChunk;
+	static HeapChunk* m_pCurrentChunk;
+	static Variant* m_pCurrentSlot;
 
 #ifdef _DEBUG
-	std::ofstream log;
-	inline void Log(const string messege)
+	static std::ofstream log;
+	static inline void Log(const string messege)
 	{
 		log << messege << std::endl;
 	}

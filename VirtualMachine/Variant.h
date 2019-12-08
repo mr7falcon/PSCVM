@@ -97,22 +97,7 @@ struct Variant
 		*((Variant*)pValue + i) = *var;
 	}
 
-	inline void PushBack(Variant* var, VirtualMachine* pvm)
-	{
-		++usLength;
-		const unsigned short capacity = (unsigned short)((Variant*)pValue - 1)->dValue;
-		if (usLength > capacity)
-		{
-			const unsigned short newCapacity = capacity >> c_capInc;
-			Variant* pArr = (Variant*)pValue;
-			Variant* iter = pvm->HeapAlloc(newCapacity + 1);
-			*(iter++) = Variant(newCapacity);
-			memcpy(iter, pArr, sizeof(Variant) * capacity);
-			pvm->HeapChangeRefs(pArr, iter);
-		}
-
-		*((Variant*)pValue + usLength - 1) = *var;
-	}
+	void PushBack(Variant* var); //better to be inline but i can't use VM methods in this header
 
 	inline Variant DictGet(Variant* key) const
 	{
@@ -220,7 +205,7 @@ struct Variant
 	static bool Equal(Variant* op1, Variant* op2);
 
 	const string ToString() const;
-	static Variant FromBytes(byte** pc, VirtualMachine* pvm);
+	static Variant FromBytes(byte** pc);
 
 	union
 	{

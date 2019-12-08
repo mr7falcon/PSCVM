@@ -2,9 +2,20 @@
 #include <cstring>
 #include <iostream>
 
-VirtualMachine::VirtualMachine()
-	: m_nCapacity(64)
+Variant* VirtualMachine::m_pStack;
+VirtualMachine::HeapChunk* VirtualMachine::m_pFirstChunk;
+VirtualMachine::HeapChunk* VirtualMachine::m_pCurrentChunk;
+Variant* VirtualMachine::m_sp;
+Variant* VirtualMachine::m_pCurrentSlot;
+Variant* VirtualMachine::m_bp;
+int VirtualMachine::m_nCapacity;
+#ifdef _DEBUG
+std::ofstream VirtualMachine::log;
+#endif
+
+void VirtualMachine::Initialize()
 {
+	m_nCapacity = 64;
 	m_pStack = new Variant[m_nCapacity];
 	m_sp = m_pStack + m_nCapacity;
 	m_bp = m_pStack - 1;
@@ -18,7 +29,7 @@ VirtualMachine::VirtualMachine()
 #endif
 }
 
-VirtualMachine::~VirtualMachine()
+void VirtualMachine::ShutDown()
 {
 	for (Variant* iter = m_pStack; iter < m_pStack + m_nCapacity; ++iter)
 	{
@@ -56,23 +67,6 @@ inline void VirtualMachine::Resize()
 	delete[](m_pStack);
 	m_pStack = pStack;
 	m_nCapacity = m_nCapacity + inc;
-}
-
-inline Variant* VirtualMachine::HeapAlloc(const unsigned short count)
-{
-	//throw any exception in case if count > c_nChunkSize
-
-	if (m_pCurrentSlot + count > m_pCurrentChunk->vData + c_nChunkSize)
-	{
-		m_pCurrentChunk->pNext = new HeapChunk;
-		m_pCurrentChunk = m_pCurrentChunk->pNext;
-		m_pCurrentSlot = m_pCurrentChunk->vData;
-	}
-
-	Variant* p = m_pCurrentSlot;
-	m_pCurrentSlot = m_pCurrentSlot + count + 1;
-
-	return p;
 }
 
 void VirtualMachine::HeapCollect()
@@ -195,14 +189,6 @@ VirtualMachine::HeapChunk::~HeapChunk()
 	for (Variant* iter = vData; iter < vData + c_nChunkSize; ++iter)
 	{
 		iter->Free();
-	}
-}
-
-inline void VirtualMachine::HeapChangeRefs(Variant* from, Variant* to)
-{
-	for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
-	{
-		HeapChangeRefs(sp, from, to);
 	}
 }
 
@@ -371,7 +357,7 @@ bool VirtualMachine::Run(byte* program)
 			Log("APUSH " + m_sp->ToString() + " " + std::to_string(offset));
 #endif
 
-			(m_pStack + m_nCapacity - offset)->PushBack(m_sp++, this);
+			(m_pStack + m_nCapacity - offset)->PushBack(m_sp++);
 		}
 		break;
 		case ByteCommand::DFETCH:
@@ -486,7 +472,7 @@ bool VirtualMachine::Run(byte* program)
 			{
 				Resize();
 			}
-			*(--m_sp) = Variant::FromBytes(&pc, this);
+			*(--m_sp) = Variant::FromBytes(&pc);
 
 #ifdef _DEBUG
 			Log("PUSH " + m_sp->ToString());
@@ -817,13 +803,13 @@ bool VirtualMachine::Run(byte* program)
 	}
 }
 
-const Variant* VirtualMachine::GetStack(int* size) const
+const Variant* VirtualMachine::GetStack(int* size)
 {
 	*size = m_nCapacity;
 	return m_pStack;
 }
 
-const string VirtualMachine::GetStack() const
+const string VirtualMachine::GetStack()
 {
 	string sStack = "";
 	for (Variant* p = m_sp; p < m_pStack + m_nCapacity; ++p)
@@ -837,9 +823,9 @@ extern "C"
 {
 	__declspec(dllexport) bool __stdcall VMRun(byte* program)
 	{
-		VirtualMachine vm;
-		bool bSuccsess = vm.Run(program);
-		string sStack = vm.GetStack();
+		VirtualMachine::Initialize();
+		bool bSuccsess = VirtualMachine::Run(program);
+		string sStack = VirtualMachine::GetStack();
 		std::cout << sStack << std::endl;
 		return bSuccsess;
 	}
