@@ -80,18 +80,57 @@ void VirtualMachine::HeapCollect()
 		{
 			if (sp->usType == VarType::ARR)
 			{
-				if (((Variant*)sp->pValue)->usNull != c_bReplaced)
+				if (!((Variant*)sp->pValue)->nReplaced)
 				{
-					Variant* pArr = (Variant*)sp->pValue;
-					const unsigned short capacity = (unsigned short)(pArr - 1)->dValue + 1;
-					Variant* iter = HeapAlloc(capacity);
-					sp->pValue = iter + 1;
-					for (Variant* p = pArr - 1; p < pArr + sp->usLength; ++p, ++iter)
+					Variant* pGlobDesc = (Variant*)sp->pValue;
+					const unsigned short capacity = pGlobDesc->nCap;
+
+					if (pGlobDesc->pValue)
 					{
-						HeapMove(p, iter);
+						Variant* iter = HeapAlloc(capacity + 2);
+						sp->pValue = iter;
+						Variant* pLocalDesc = iter + 1;
+						*pLocalDesc = Variant((unsigned int)capacity);
+						*iter = Variant(capacity, pLocalDesc);
+
+						iter += 2;
+						pLocalDesc = (Variant*)pGlobDesc->pValue;
+						Variant* pArr = pLocalDesc + 1;
+						unsigned short length = sp->usLength;
+
+						while (pLocalDesc->pValue)
+						{
+							const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+
+							for (; pArr <= pLocalDesc + capacity; ++pArr, ++iter)
+							{
+								HeapMove(pArr, iter);
+							}
+
+							length -= capacity;
+							pLocalDesc = (Variant*)pLocalDesc->pValue;
+							pArr = pLocalDesc + 1;
+						}
+
+						for (; pArr <= pLocalDesc + length; ++pArr, ++iter)
+						{
+							HeapMove(pArr, iter);
+						}
 					}
-					pArr->usNull = c_bReplaced;
-					pArr->pValue = sp->pValue;
+					else
+					{
+						Variant* iter = HeapAlloc(capacity + 1);
+						sp->pValue = iter;
+						*(iter++) = Variant((unsigned int)capacity);
+						
+						for (Variant* pArr = pGlobDesc + 1; pArr <= pGlobDesc + sp->usLength; ++pArr, ++iter)
+						{
+							HeapMove(pArr, iter);
+						}
+					}
+
+					pGlobDesc->nReplaced = 1;
+					pGlobDesc->pValue = sp->pValue;
 				}
 				else
 				{
@@ -100,7 +139,7 @@ void VirtualMachine::HeapCollect()
 			}
 			else if (sp->usType == VarType::DICT)
 			{
-				if (((Variant*)sp->pValue)->usNull != c_bReplaced)
+				/*if (((Variant*)sp->pValue)->usNull != c_bReplaced)
 				{
 					Variant* pDict = (Variant*)sp->pValue;
 					const unsigned int capacity = (unsigned int)(pDict - 1)->dValue + 1;
@@ -117,7 +156,7 @@ void VirtualMachine::HeapCollect()
 				else
 				{
 					sp->pValue = ((Variant*)sp->pValue)->pValue;
-				}
+				}*/
 			}
 		}
 	}
@@ -136,33 +175,71 @@ void VirtualMachine::HeapMove(Variant* from, Variant* to)
 {
 	from->Copy();
 	to->dValue = from->dValue;
-	to->pValue = from->pValue;
 
-	if (to->usNull == Variant::c_null)
+	if (from->usNull == Variant::c_null)
 	{
-		if (to->usType == VarType::ARR)
+		if (from->usType == VarType::ARR)
 		{
-			if (((Variant*)to->pValue)->usNull != c_bReplaced)
+			if (!((Variant*)from->pValue)->nReplaced)
 			{
-				Variant* pArr = (Variant*)to->pValue;
-				const unsigned short capacity = (unsigned short)(pArr - 1)->dValue + 1;
-				Variant* iter = HeapAlloc(capacity);
-				to->pValue = (void*)iter;
-				for (Variant* p = pArr - 1; p < pArr + to->usLength; ++p, ++iter)
+				Variant* pGlobDesc = (Variant*)from->pValue;
+				const unsigned short capacity = pGlobDesc->nCap;
+
+				if (pGlobDesc->pValue)
 				{
-					HeapMove(p, iter);
+					Variant* iter = HeapAlloc(capacity + 2);
+					to->pValue = iter;
+					Variant* pLocalDesc = iter + 1;
+					*pLocalDesc = Variant((unsigned int)capacity);
+					*iter = Variant(capacity, pLocalDesc);
+
+					iter += 2;
+					pLocalDesc = (Variant*)pGlobDesc->pValue;
+					Variant* pArr = pLocalDesc + 1;
+					unsigned short length = from->usLength;
+
+					while (pLocalDesc->pValue)
+					{
+						const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+
+						for (; pArr <= pLocalDesc + capacity; ++pArr, ++iter)
+						{
+							HeapMove(pArr, iter);
+						}
+
+						length -= capacity;
+						pLocalDesc = (Variant*)pLocalDesc->pValue;
+						pArr = pLocalDesc + 1;
+					}
+
+					for (; pArr <= pLocalDesc + length; ++pArr, ++iter)
+					{
+						HeapMove(pArr, iter);
+					}
 				}
-				pArr->usNull = c_bReplaced;
-				pArr->pValue = to->pValue;
+				else
+				{
+					Variant* iter = HeapAlloc(capacity + 1);
+					to->pValue = iter;
+					*(iter++) = Variant((unsigned int)capacity);
+
+					for (Variant* pArr = pGlobDesc + 1; pArr <= pGlobDesc + from->usLength; ++pArr, ++iter)
+					{
+						HeapMove(pArr, iter);
+					}
+				}
+
+				pGlobDesc->nReplaced = 1;
+				pGlobDesc->pValue = to->pValue;
 			}
 			else
 			{
-				to->pValue = ((Variant*)to->pValue)->pValue;
+				to->pValue = ((Variant*)from->pValue)->pValue;
 			}
 		}
 		else if (to->usType == VarType::DICT)
 		{
-			if (((Variant*)to->pValue)->usNull != c_bReplaced)
+			/*if (((Variant*)to->pValue)->usNull != c_bReplaced)
 			{
 				Variant* pDict = (Variant*)to->pValue;
 				const unsigned int capacity = (unsigned int)(pDict - 1)->dValue + 1;
@@ -179,7 +256,7 @@ void VirtualMachine::HeapMove(Variant* from, Variant* to)
 			else
 			{
 				to->pValue = ((Variant*)to->pValue)->pValue;
-			}
+			}*/
 		}
 	}
 }
@@ -190,39 +267,6 @@ VirtualMachine::HeapChunk::~HeapChunk()
 	{
 		iter->Free();
 	}
-}
-
-void VirtualMachine::HeapChangeRefs(Variant* var, Variant* from, Variant* to)
-{
-	if (var->usNull == Variant::c_null)
-	{
-		if (var->usType == VarType::ARR)
-		{
-			for (Variant* p = (Variant*)var->pValue; p < (Variant*)var->pValue + var->usLength; ++p)
-			{
-				HeapChangeRefs(p, from, to);
-			}
-
-			if (var->pValue == from)
-			{
-				var->pValue = to;
-			}
-		}
-		else if (var->usType == VarType::DICT)
-		{
-			const unsigned int len = var->usLength << 1;
-			for (Variant* p = (Variant*)var->pValue; p < (Variant*)var->pValue + len; ++p)
-			{
-				HeapChangeRefs(p, from, to);
-			}
-
-			if (var->pValue == from)
-			{
-				var->pValue = to;
-			}
-		}
-	}
-
 }
 
 bool VirtualMachine::Run(byte* program)
@@ -444,11 +488,22 @@ bool VirtualMachine::Run(byte* program)
 			Log("ARR " + std::to_string(len));
 #endif
 
-			const unsigned int capacity = len + (len >> Variant::c_capInc);
-			Variant* arr = HeapAlloc(capacity + 1);
-			*(arr++) = Variant(capacity);
-			*m_sp = Variant(arr, len, VarType::ARR);
+			*m_sp = Variant::ArrCreate(len);
 		}
+		break;
+		case ByteCommand::FARRAY:
+		{
+			m_sp->Free();
+			const unsigned short len = (unsigned short)m_sp->dValue;
+			//throw any exception if there's NaN;
+
+#ifdef _DEBUG
+			Log("FARR " + std::to_string(len));
+#endif
+
+			*m_sp = Variant::ArrCreate(len, true);
+		}
+		break;
 		case ByteCommand::DICTIONARY:
 		{
 			m_sp->Free();
@@ -459,11 +514,20 @@ bool VirtualMachine::Run(byte* program)
 			Log("DICT " + std::to_string(len));
 #endif
 
-			const unsigned int realLen = (unsigned int)len << 1;
-			const unsigned int capacity = realLen + (realLen >> Variant::c_capInc);
-			Variant* dict = HeapAlloc(capacity + 1);
-			*(dict++) = Variant(capacity);
-			*m_sp = Variant(dict, len, VarType::DICT);
+			* m_sp = Variant::DictCreate(len);
+		}
+		break;
+		case ByteCommand::FDICTIONARY:
+		{
+			m_sp->Free();
+			const unsigned short len = (unsigned short)m_sp->dValue;
+			//throw any exception if there's NaN;
+
+#ifdef _DEBUG
+			Log("FDICT " + std::to_string(len));
+#endif
+
+			*m_sp = Variant::DictCreate(len, true);
 		}
 		break;
 		case ByteCommand::PUSH:

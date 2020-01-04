@@ -40,10 +40,12 @@ enum ByteCommand : byte
 	JMP,
 	HALT,
 	ARRAY,
+	FARRAY,
 	ASTORE,
 	AFETCH,
 	APUSH,
 	DICTIONARY,
+	FDICTIONARY,
 	DSTORE,
 	DFETCH,
 	DINSERT,
@@ -57,29 +59,27 @@ public:
 	static inline void Initialize();
 	static inline void ShutDown();
 
-	static inline Variant* HeapAlloc(const unsigned short count = 1)
-	{
-		//throw any exception in case if count > c_nChunkSize
+	static inline Variant* HeapAlloc(const unsigned int count = 1)
+	{	
+		Variant* p = m_pCurrentSlot;
+		const unsigned short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - p);
+		unsigned short nCountRemain = count;
 
-		if (m_pCurrentSlot + count > m_pCurrentChunk->vData + c_nChunkSize)
+		if (nCountRemain > nChunkRemain)
 		{
-			m_pCurrentChunk->pNext = new HeapChunk;
-			m_pCurrentChunk = m_pCurrentChunk->pNext;
-			m_pCurrentSlot = m_pCurrentChunk->vData;
+			nCountRemain -= nChunkRemain;
+			const unsigned int chunks = nChunkRemain / c_nChunkSize + 1;
+			for (unsigned int i = 0; i < chunks; ++i)
+			{
+				m_pCurrentChunk->pNext = new HeapChunk;
+				m_pCurrentChunk = m_pCurrentChunk->pNext;
+			}
+			nCountRemain %= c_nChunkSize;
 		}
 
-		Variant* p = m_pCurrentSlot;
-		m_pCurrentSlot = m_pCurrentSlot + count + 1;
+		m_pCurrentSlot = m_pCurrentSlot + nCountRemain + 1;
 
 		return p;
-	}
-
-	static inline void HeapChangeRefs(Variant* from, Variant* to)
-	{
-		for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
-		{
-			HeapChangeRefs(sp, from, to);
-		}
 	}
 
 	static inline bool Run(byte* program);
@@ -90,14 +90,12 @@ public:
 private:
 	VirtualMachine();
 
-	static const int c_nChunkSize = 64;
-	static const unsigned short c_bReplaced = 0x7FF1;
+	static const unsigned short c_nChunkSize = 256;
 
 	static inline void Resize();
 
 	static inline void HeapCollect();
 	static void HeapMove(Variant* from, Variant* to);
-	static void HeapChangeRefs(Variant* var, Variant* from, Variant* to);
 
 	static Variant* m_pStack;
 	static int m_nCapacity;
@@ -106,8 +104,8 @@ private:
 
 	struct HeapChunk
 	{
-		HeapChunk* pNext = nullptr;
 		Variant vData[c_nChunkSize];
+		HeapChunk* pNext = nullptr;
 
 		~HeapChunk();
 	};

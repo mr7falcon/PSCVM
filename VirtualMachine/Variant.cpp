@@ -21,12 +21,49 @@ const string Variant::ToString() const
 	}
 	else if (usType == VarType::ARR)
 	{
-		string str = '{' + ((Variant*)pValue)->ToString();
-		for (Variant* p = (Variant*)pValue + 1; p < (Variant*)pValue + usLength; ++p)
+		Variant* pGlobalDesc = (Variant*)pValue;
+		string str = "{";
+		
+		if (Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue)
 		{
-			str = str + " | " + p->ToString();
+			unsigned short length = usLength;
+			Variant* arr = pLocalDesc + 1;
+			str += (arr++)->ToString();
+
+			while (pLocalDesc->pValue)
+			{
+				const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+
+				for (; arr <= pLocalDesc + capacity; ++arr)
+				{
+					str = str + " | " + arr->ToString();
+				}
+
+				length -= capacity;
+				pLocalDesc = (Variant*)pLocalDesc->pValue;
+				arr = pLocalDesc + 1;
+			}
+
+			for (; arr <= pLocalDesc + length; ++arr)
+			{
+				str = str + " | " + arr->ToString();
+			}
+
+			str += '}';
 		}
-		str += '}';
+		else
+		{
+			Variant* arr = pGlobalDesc + 1;
+			str += (arr++)->ToString();
+
+			for (; arr <= pGlobalDesc + usLength; ++arr)
+			{
+				str = str + " | " + arr->ToString();
+			}
+
+			str += '}';
+		}
+
 		return str;
 	}
 	else if (usType == VarType::DICT)
@@ -56,20 +93,21 @@ Variant Variant::FromBytes(byte** pc)
 
 	if (var.usNull == c_null)
 	{
+		const unsigned short length = var.usLength;
 		if (var.usType == VarType::STR)
 		{
-			char* str = new char[var.usLength];
-			memcpy(str, *pc, var.usLength);
-			*pc += var.usLength;
+			char* str = new char[length];
+			memcpy(str, *pc, length);
+			*pc += length;
 			var.pValue = str;
 		}
 		else if (var.usType == VarType::ARR)
 		{
-			const unsigned short capacity = var.usLength + (var.usLength >> c_capInc);
-			Variant* arr = VirtualMachine::HeapAlloc(capacity + 1);
-			*(arr++) = Variant(capacity);
+			const unsigned short length = var.usLength;
+			Variant* arr = VirtualMachine::HeapAlloc(length + 1);
+			*(arr++) = Variant((const unsigned int)length);
 
-			for (Variant* p = arr; p < arr + var.usLength; ++p)
+			for (Variant* p = arr; p < arr + length; ++p)
 			{
 				*p = Variant::FromBytes(pc);
 			}
@@ -78,17 +116,17 @@ Variant Variant::FromBytes(byte** pc)
 		}
 		else if (var.usType == VarType::DICT)
 		{
-			const unsigned int len = var.usLength << 1;
-			const unsigned int capacity = len + (len >> c_capInc);
+			const unsigned int capacity = length << 1;
 			Variant* dict = VirtualMachine::HeapAlloc(capacity + 1);
-			*(dict++) = Variant(capacity);
+			*(dict++) = Variant((const unsigned int)length);
 
-			for (unsigned short i = 0; i < var.usLength; ++i)
+			for (unsigned short i = 0; i < length; ++i)
 			{
 				Variant key = Variant::FromBytes(pc);
-				Variant* cell = dict + key.GetHash(capacity);
+				const unsigned int index = key.GetHash(length) << 1;
+				Variant* cell = dict + (index);
 
-				while (!(cell->usNull == c_null && cell->pValue))
+				/*while (!(cell->usNull == c_null && cell->pValue))
 				{
 					cell += 2;
 
@@ -96,7 +134,7 @@ Variant Variant::FromBytes(byte** pc)
 					{
 						cell = dict;
 					}
-				}
+				}*/
 
 				*cell = key;
 				*(++cell) = Variant::FromBytes(pc);
@@ -140,12 +178,34 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			return false;
 		}
 
+		Variant* pGlobalDesc1 = (Variant*)op1->pValue;
+		Variant* pGlobalDesc2 = (Variant*)op2->pValue;
+		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
+		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
+		Variant* pArr1 = pLocalDesc1 ? pLocalDesc1 + 1 : pGlobalDesc1 + 1;
+		Variant* pArr2 = pLocalDesc2 ? pLocalDesc2 + 1 : pGlobalDesc2 + 1;
+
 		for (unsigned short i = 0; i < op1->usLength; ++i)
 		{
-			if (!Equal((Variant*)op1->pValue + i, (Variant*)op2->pValue + i))
+			if (pLocalDesc1 && pArr1 == pLocalDesc1 + (unsigned short)pLocalDesc1->nCap)
+			{
+				pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
+				pArr1 = pLocalDesc1 + 1;
+			}
+
+			if (pLocalDesc2 && pArr2 == pLocalDesc2 + (unsigned short)pLocalDesc2->nCap)
+			{
+				pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+				pArr2 = pLocalDesc2 + 1;
+			}
+
+			if (!Equal(pArr1, pArr2))
 			{
 				return false;
 			}
+
+			++pArr1;
+			++pArr2;
 		}
 
 		return true;
@@ -171,21 +231,4 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	{
 		return false;
 	}
-}
-
-void Variant::PushBack(Variant* var)
-{
-	++usLength;
-	const unsigned short capacity = (unsigned short)((Variant*)pValue - 1)->dValue;
-	if (usLength > capacity)
-	{
-		const unsigned short newCapacity = capacity >> c_capInc;
-		Variant* pArr = (Variant*)pValue;
-		Variant* iter = VirtualMachine::HeapAlloc(newCapacity + 1);
-		*(iter++) = Variant(newCapacity);
-		memcpy(iter, pArr, sizeof(Variant) * capacity);
-		VirtualMachine::HeapChangeRefs(pArr, iter);
-	}
-
-	*((Variant*)pValue + usLength - 1) = *var;
 }

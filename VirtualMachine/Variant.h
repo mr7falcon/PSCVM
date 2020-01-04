@@ -13,6 +13,7 @@ enum VarType : unsigned short
 	STR,
 	ARR,
 	DICT,
+	DESC
 };
 
 struct Variant
@@ -20,17 +21,17 @@ struct Variant
 	static const unsigned short c_null = 0x7FF0;
 	static const char c_capInc = 2;
 
-	Variant()
+	inline Variant()
 		: pValue(nullptr),
 		  usNull(c_null)
 	{}
 
-	Variant(const double val)
+	inline Variant(const double val)
 		: pValue(nullptr),
 		  dValue(val)
 	{}
 
-	Variant(char* str, const unsigned short length)
+	inline Variant(char* str, const unsigned short length)
 		: usNull(c_null),
 		  usType(VarType::STR),
 		  usLength(length),
@@ -38,12 +39,18 @@ struct Variant
 		  pValue(str)
 	{}
 
-	Variant(Variant* var, const unsigned short length, const unsigned short type)
+	inline Variant(Variant* var, const unsigned short length, const unsigned short type)
 		: usNull(c_null),
 		  usType(type),
 		  usLength(length),
 		  usRef(1),
 		  pValue(var)
+	{}
+
+	inline Variant(const unsigned int cap, Variant* next = nullptr)
+		: nCap(cap),
+		  nReplaced(0),
+		  pValue(next)
 	{}
 
 	~Variant();
@@ -85,42 +92,175 @@ struct Variant
 		}
 	}
 
+	inline static Variant ArrCreate(const unsigned short length, bool fixed = false)
+	{
+		Variant* arr;
+
+		if (fixed)
+		{
+			arr = VirtualMachine::HeapAlloc(length + 1);
+			*arr = Variant((const unsigned int)length);
+		}
+		else
+		{
+			const short int capacity = length + (length >> c_capInc);
+			arr = VirtualMachine::HeapAlloc(capacity + 2);
+			Variant* pLocalDesc = arr + 1;
+			*pLocalDesc = Variant((const unsigned int)capacity);
+			*arr = Variant(capacity, pLocalDesc);
+		}
+
+		return Variant(arr, length, VarType::ARR);
+	}
+
+	inline static Variant DictCreate(const unsigned short length, bool fixed = false)
+	{
+		Variant* dict;
+
+		if (fixed)
+		{
+			const unsigned int realLen = (unsigned int)length << 1;
+			dict = VirtualMachine::HeapAlloc(realLen + 1);
+			*dict = Variant((const unsigned int)length);
+		}
+		else
+		{
+			const unsigned short capacity = length + (length >> Variant::c_capInc);
+			dict = VirtualMachine::HeapAlloc((capacity << 1) + 2);
+			Variant* pLocalDesc = dict + 1;
+			*pLocalDesc = Variant((unsigned int)capacity);
+			*dict = Variant(capacity, pLocalDesc);
+		}
+
+		return Variant(dict, length, VarType::DICT);
+	}
+
 	inline Variant ArrGet(const unsigned short i) const
 	{
-		Variant* var = (Variant*)pValue + i;
+		if (i >= usLength)
+		{
+			//throw some exception
+		}
+
+		Variant* var;
+
+		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
+		{
+			unsigned short index = i;
+			while (index >= (unsigned short)p->nCap)
+			{
+				index -= (unsigned short)p->nCap;
+				p = (Variant*)p->pValue;
+			}
+			var = p + 1 + index;
+		}
+		else
+		{
+			var = (Variant*)pValue + 1 + i;
+		}
+
 		var->Copy();
 		return *var;
 	}
 
 	inline void ArrSet(const unsigned short i, Variant* var)
 	{
-		*((Variant*)pValue + i) = *var;
+		if (i >= usLength)
+		{
+			//throw some exception
+		}
+
+		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
+		{
+			unsigned short index = i;
+			while (index >= (unsigned short)p->nCap)
+			{
+				index -= (unsigned short)p->nCap;
+				p = (Variant*)p->pValue;
+			}
+			*(p + 1 + index) = *var;
+		}
+		else
+		{
+			*((Variant*)pValue + 1 + i) = *var;
+		}
 	}
 
-	void PushBack(Variant* var); //better to be inline but i can't use VM methods in this header
+	inline void PushBack(Variant* var)
+	{
+		Variant* pGlobalDesc = (Variant*)pValue;
+		if (!pGlobalDesc->pValue)
+		{
+			//array is fixed, throw exception
+		}
+
+		const unsigned short cap = (unsigned short)((Variant*)pValue)->nCap;
+		if (usLength == cap)
+		{
+			const unsigned short inc = cap >> c_capInc;
+			Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc + 1);
+			*pLocalDesc = Variant((unsigned int)inc);
+			*(pLocalDesc + 1) = *var;
+
+			Variant* p = (Variant*)pGlobalDesc->pValue;
+			while (p->pValue)
+			{
+				p = (Variant*)p->pValue;
+			}
+			p->pValue = pLocalDesc;
+			pGlobalDesc->nCap += inc;
+		}
+		else
+		{
+			Variant* p = (Variant*)pGlobalDesc->pValue;
+			unsigned short length = usLength;
+			while (p->pValue)
+			{
+				length -= (unsigned short)p->nCap;
+				p = (Variant*)p->pValue;
+			}
+
+			*(p + 1 + length) = *var;
+		}
+
+		++usLength;
+	}
 
 	inline Variant DictGet(Variant* key) const
 	{
-		const unsigned int capacity = (unsigned int)((Variant*)pValue - 1)->dValue;
-		const unsigned int index = key->GetHash(capacity) << 1;
-		const unsigned int len = usLength << 1;
+		const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
+		unsigned short index = key->GetHash(capacity);
 
-		Variant* cell = (Variant*)pValue + index;
+		Variant* cell;
 
-		while (!Equal(key, cell))
+		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
 		{
-			cell += 2;
-
-			if (cell->usNull == c_null && cell->pValue)
+			while (index >= (unsigned short)p->nCap)
 			{
-				//key is missing, throw any exception
+				index -= (unsigned short)p->nCap;
+				p = (Variant*)p->pValue;
 			}
-
-			if (cell >= (Variant*)pValue + capacity)
-			{
-				cell = (Variant*)pValue;
-			}
+			cell = p + 1 + ((unsigned int)index << 1);
 		}
+		else
+		{
+			cell = (Variant*)pValue + 1 + ((unsigned int)index << 1);
+		}
+
+		//while (!Equal(key, cell))
+		//{
+		//	cell += 2;
+
+		//	if (cell->usNull == c_null && cell->pValue)
+		//	{
+		//		//key is missing, throw any exception
+		//	}
+
+		//	if (cell >= (Variant*)pValue + capacity)
+		//	{
+		//		cell = (Variant*)pValue;
+		//	}
+		//}
 
 		(++cell)->Copy();
 		return *cell;
@@ -128,26 +268,39 @@ struct Variant
 
 	inline void DictSet(Variant* key, Variant* val)
 	{
-		const unsigned int capacity = (unsigned int)((Variant*)pValue - 1)->dValue;
-		const unsigned int index = key->GetHash(capacity) << 1;
-		const unsigned int len = usLength << 1;
+		const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
+		unsigned short index = key->GetHash(capacity);
 
-		Variant* cell = (Variant*)pValue + index;
+		Variant* cell;
 
-		while (!Equal(key, cell))
+		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
 		{
-			cell += 2;
-
-			if (cell->usNull == c_null && cell->pValue)
+			while (index >= (unsigned short)p->nCap)
 			{
-				//key is missing, throw any exception
+				index -= (unsigned short)p->nCap;
+				p = (Variant*)p->pValue;
 			}
-
-			if (cell >= (Variant*)pValue + capacity)
-			{
-				cell = (Variant*)pValue;
-			}
+			cell = p + 1 + ((unsigned int)index << 1);
 		}
+		else
+		{
+			cell = (Variant*)pValue + 1 + ((unsigned int)index << 1);
+		}
+
+		//while (!Equal(key, cell))
+		//{
+		//	cell += 2;
+
+		//	if (cell->usNull == c_null && cell->pValue)
+		//	{
+		//		//key is missing, throw any exception
+		//	}
+
+		//	if (cell >= (Variant*)pValue + capacity)
+		//	{
+		//		cell = (Variant*)pValue;
+		//	}
+		//}
 
 		*(++cell) = *val;
 	}
@@ -218,6 +371,12 @@ struct Variant
 			unsigned short usType;
 			unsigned short usLength;
 			unsigned short usRef;
+		};
+
+		struct
+		{
+			unsigned int nCap;
+			unsigned int nReplaced;
 		};
 	};
 
