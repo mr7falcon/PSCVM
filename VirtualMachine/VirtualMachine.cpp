@@ -488,7 +488,12 @@ bool VirtualMachine::Run(byte* program)
 			Log("ARR " + std::to_string(len));
 #endif
 
-			*m_sp = Variant::ArrCreate(len);
+			const short int capacity = len + (len >> Variant::c_capInc);
+			Variant* arr = VirtualMachine::HeapAlloc(capacity + 2);
+			Variant* pLocalDesc = arr + 1;
+			*pLocalDesc = Variant((const unsigned int)capacity);
+			*arr = Variant(capacity, pLocalDesc);
+			*m_sp = Variant(arr, len, VarType::ARR);
 		}
 		break;
 		case ByteCommand::FARRAY:
@@ -501,7 +506,9 @@ bool VirtualMachine::Run(byte* program)
 			Log("FARR " + std::to_string(len));
 #endif
 
-			*m_sp = Variant::ArrCreate(len, true);
+			Variant* arr = VirtualMachine::HeapAlloc(len + 1);
+			*arr = Variant((const unsigned int)len);
+			*m_sp = Variant(arr, len, VarType::ARR);
 		}
 		break;
 		case ByteCommand::DICTIONARY:

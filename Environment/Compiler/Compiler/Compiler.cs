@@ -39,6 +39,16 @@ namespace Compiler
             JNZ,
             JMP,
             HALT,
+            ARRAY,
+            FARRAY,
+            ASTORE,
+            AFETCH,
+            APUSH,
+            DICTIONARY,
+            FDICTIONARY,
+            DSTORE,
+            DFETCH,
+            DINSERT,
 
             NONE
         };
@@ -287,6 +297,24 @@ namespace Compiler
                         break;
                     case "HALT":
                         byteCode.Add((byte)ByteCommand.HALT);
+                        break;
+                    case "ARR":
+                        byteCode.Add((byte)ByteCommand.ARRAY);
+                        break;
+                    case "FARR":
+                        byteCode.Add((byte)ByteCommand.FARRAY);
+                        break;
+                    case "AFETCH":
+                        byteCode.Add((byte)ByteCommand.AFETCH);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "ASTORE":
+                        byteCode.Add((byte)ByteCommand.ASTORE);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "APUSH":
+                        byteCode.Add((byte)ByteCommand.APUSH);
+                        byteCode.AddRange(AddInt());
                         break;
                     default:
                         throw new Exception("unknown command");

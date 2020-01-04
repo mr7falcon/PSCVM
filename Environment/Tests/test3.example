@@ -1,8 +1,0 @@
-PUSH 'string1'
-PUSH 'string2'
-EQ
-PUSH 'string'
-PUSH 'string'
-EQ
-PUSH 'StringForOutput'
-HALT

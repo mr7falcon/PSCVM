@@ -105,9 +105,9 @@ Variant Variant::FromBytes(byte** pc)
 		{
 			const unsigned short length = var.usLength;
 			Variant* arr = VirtualMachine::HeapAlloc(length + 1);
-			*(arr++) = Variant((const unsigned int)length);
+			*arr = Variant((const unsigned int)length);
 
-			for (Variant* p = arr; p < arr + length; ++p)
+			for (Variant* p = arr + 1; p <= arr + length; ++p)
 			{
 				*p = Variant::FromBytes(pc);
 			}
@@ -187,13 +187,13 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 
 		for (unsigned short i = 0; i < op1->usLength; ++i)
 		{
-			if (pLocalDesc1 && pArr1 == pLocalDesc1 + (unsigned short)pLocalDesc1->nCap)
+			if (pLocalDesc1 && pArr1 == pLocalDesc1 + (unsigned short)pLocalDesc1->nCap + 1)
 			{
 				pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
 				pArr1 = pLocalDesc1 + 1;
 			}
 
-			if (pLocalDesc2 && pArr2 == pLocalDesc2 + (unsigned short)pLocalDesc2->nCap)
+			if (pLocalDesc2 && pArr2 == pLocalDesc2 + (unsigned short)pLocalDesc2->nCap + 1)
 			{
 				pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
 				pArr2 = pLocalDesc2 + 1;
@@ -231,4 +231,44 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	{
 		return false;
 	}
+}
+
+void Variant::PushBack(Variant* var)
+{
+	Variant* pGlobalDesc = (Variant*)pValue;
+	if (!pGlobalDesc->pValue)
+	{
+		//array is fixed, throw exception
+	}
+
+	const unsigned short cap = (unsigned short)((Variant*)pValue)->nCap;
+	if (usLength == cap)
+	{
+		const unsigned short inc = cap >> c_capInc;
+		Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc + 1);
+		*pLocalDesc = Variant((unsigned int)inc);
+		*(pLocalDesc + 1) = *var;
+
+		Variant* p = (Variant*)pGlobalDesc->pValue;
+		while (p->pValue)
+		{
+			p = (Variant*)p->pValue;
+		}
+		p->pValue = pLocalDesc;
+		pGlobalDesc->nCap += inc;
+	}
+	else
+	{
+		Variant* p = (Variant*)pGlobalDesc->pValue;
+		unsigned short length = usLength;
+		while (p->pValue)
+		{
+			length -= (unsigned short)p->nCap;
+			p = (Variant*)p->pValue;
+		}
+
+		*(p + 1 + length) = *var;
+	}
+
+	++usLength;
 }

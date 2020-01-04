@@ -12,8 +12,7 @@ enum VarType : unsigned short
 {
 	STR,
 	ARR,
-	DICT,
-	DESC
+	DICT
 };
 
 struct Variant
@@ -92,30 +91,9 @@ struct Variant
 		}
 	}
 
-	inline static Variant ArrCreate(const unsigned short length, bool fixed = false)
-	{
-		Variant* arr;
-
-		if (fixed)
-		{
-			arr = VirtualMachine::HeapAlloc(length + 1);
-			*arr = Variant((const unsigned int)length);
-		}
-		else
-		{
-			const short int capacity = length + (length >> c_capInc);
-			arr = VirtualMachine::HeapAlloc(capacity + 2);
-			Variant* pLocalDesc = arr + 1;
-			*pLocalDesc = Variant((const unsigned int)capacity);
-			*arr = Variant(capacity, pLocalDesc);
-		}
-
-		return Variant(arr, length, VarType::ARR);
-	}
-
 	inline static Variant DictCreate(const unsigned short length, bool fixed = false)
 	{
-		Variant* dict;
+		/*Variant* dict;
 
 		if (fixed)
 		{
@@ -132,7 +110,8 @@ struct Variant
 			*dict = Variant(capacity, pLocalDesc);
 		}
 
-		return Variant(dict, length, VarType::DICT);
+		return Variant(dict, length, VarType::DICT);*/
+		return Variant();
 	}
 
 	inline Variant ArrGet(const unsigned short i) const
@@ -186,50 +165,13 @@ struct Variant
 		}
 	}
 
-	inline void PushBack(Variant* var)
-	{
-		Variant* pGlobalDesc = (Variant*)pValue;
-		if (!pGlobalDesc->pValue)
-		{
-			//array is fixed, throw exception
-		}
-
-		const unsigned short cap = (unsigned short)((Variant*)pValue)->nCap;
-		if (usLength == cap)
-		{
-			const unsigned short inc = cap >> c_capInc;
-			Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc + 1);
-			*pLocalDesc = Variant((unsigned int)inc);
-			*(pLocalDesc + 1) = *var;
-
-			Variant* p = (Variant*)pGlobalDesc->pValue;
-			while (p->pValue)
-			{
-				p = (Variant*)p->pValue;
-			}
-			p->pValue = pLocalDesc;
-			pGlobalDesc->nCap += inc;
-		}
-		else
-		{
-			Variant* p = (Variant*)pGlobalDesc->pValue;
-			unsigned short length = usLength;
-			while (p->pValue)
-			{
-				length -= (unsigned short)p->nCap;
-				p = (Variant*)p->pValue;
-			}
-
-			*(p + 1 + length) = *var;
-		}
-
-		++usLength;
-	}
+	void PushBack(Variant* var); //better to be inline but cant be that with VM methods
 
 	inline Variant DictGet(Variant* key) const
 	{
 		const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
 		unsigned short index = key->GetHash(capacity);
+		const unsigned int pos = (unsigned int)index << 1;
 
 		Variant* cell;
 
@@ -240,11 +182,11 @@ struct Variant
 				index -= (unsigned short)p->nCap;
 				p = (Variant*)p->pValue;
 			}
-			cell = p + 1 + ((unsigned int)index << 1);
+			cell = p + 1 + pos;
 		}
 		else
 		{
-			cell = (Variant*)pValue + 1 + ((unsigned int)index << 1);
+			cell = (Variant*)pValue + 1 + pos;
 		}
 
 		//while (!Equal(key, cell))
@@ -270,6 +212,7 @@ struct Variant
 	{
 		const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
 		unsigned short index = key->GetHash(capacity);
+		const unsigned int pos = (unsigned int)index << 1;
 
 		Variant* cell;
 
@@ -280,11 +223,11 @@ struct Variant
 				index -= (unsigned short)p->nCap;
 				p = (Variant*)p->pValue;
 			}
-			cell = p + 1 + ((unsigned int)index << 1);
+			cell = p + 1 + pos;
 		}
 		else
 		{
-			cell = (Variant*)pValue + 1 + ((unsigned int)index << 1);
+			cell = (Variant*)pValue + 1 + pos;
 		}
 
 		//while (!Equal(key, cell))
