@@ -39,6 +39,14 @@ namespace Compiler
             JNZ,
             JMP,
             HALT,
+            ARRAY,
+            ASTORE,
+            AFETCH,
+            APUSH,
+            DICTIONARY,
+            DSTORE,
+            DFETCH,
+            DINSERT,
 
             NONE
         };
@@ -46,7 +54,8 @@ namespace Compiler
         public enum VarType : ushort
         {
             STR,
-            ARR
+            ARR,
+            DICT
         }
 
         private const ushort c_null = 0x7FF0;
@@ -111,6 +120,7 @@ namespace Compiler
             else if (program[i] == '{')
             {
                 ++i;
+                ushort usType = (ushort)VarType.ARR;
                 List<byte[]> varBytes = new List<byte[]>();
                 while (true)
                 {
@@ -122,6 +132,11 @@ namespace Compiler
                     {
                         break;
                     }
+                    else if (sym == ':')
+                    {
+                        usType = (ushort)VarType.DICT;
+                        continue;
+                    }
                     else if (sym != '|')
                     {
                         //any exceptopn
@@ -129,15 +144,14 @@ namespace Compiler
                 }
 
                 ushort usNull = c_null;
-                ushort usType = (ushort)VarType.ARR;
-                ushort usLength = (ushort)varBytes.Count;
+                ushort usLength = usType == (ushort)VarType.ARR ? (ushort)varBytes.Count : (ushort)(varBytes.Count / 2);
                 List<byte> bytes = new List<byte>();
                 bytes.AddRange(BitConverter.GetBytes(usNull));
                 bytes.AddRange(BitConverter.GetBytes(usType));
                 bytes.AddRange(BitConverter.GetBytes(usLength));
                 bytes.AddRange(BitConverter.GetBytes((ushort)1));
 
-                for (int j = 0; j < usLength; ++j)
+                for (int j = 0; j < varBytes.Count; ++j)
                 {
                     bytes.AddRange(varBytes[j]);
                 }
@@ -183,8 +197,8 @@ namespace Compiler
             while (i < program.Length)
             {
                 ClearSpaces();
-
-                switch (Split())
+                string command = Split();
+                switch (command)
                 {
                     case "CALL":
                         byteCode.Add((byte)ByteCommand.CALL);
@@ -287,6 +301,36 @@ namespace Compiler
                         break;
                     case "HALT":
                         byteCode.Add((byte)ByteCommand.HALT);
+                        break;
+                    case "ARR":
+                        byteCode.Add((byte)ByteCommand.ARRAY);
+                        break;
+                    case "DICT":
+                        byteCode.Add((byte)ByteCommand.DICTIONARY);
+                        break;
+                    case "DINS":
+                        byteCode.Add((byte)ByteCommand.DINSERT);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "AFETCH":
+                        byteCode.Add((byte)ByteCommand.AFETCH);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "ASTORE":
+                        byteCode.Add((byte)ByteCommand.ASTORE);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "APUSH":
+                        byteCode.Add((byte)ByteCommand.APUSH);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "DFETCH":
+                        byteCode.Add((byte)ByteCommand.DFETCH);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "DSTORE":
+                        byteCode.Add((byte)ByteCommand.DSTORE);
+                        byteCode.AddRange(AddInt());
                         break;
                     default:
                         throw new Exception("unknown command");

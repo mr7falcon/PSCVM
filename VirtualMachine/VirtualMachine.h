@@ -57,29 +57,164 @@ public:
 	static inline void Initialize();
 	static inline void ShutDown();
 
-	static inline Variant* HeapAlloc(const unsigned short count = 1)
+	static inline Variant* HeapAlloc(const unsigned short count, bool local = false)
 	{
-		//throw any exception in case if count > c_nChunkSize
+		Variant* pGlobalDesc = m_pCurrentSlot;
+		Variant* pLocalDesc = pGlobalDesc;
+		short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - pGlobalDesc - 1);
+		unsigned short nCountRemain = count;
 
-		if (m_pCurrentSlot + count > m_pCurrentChunk->vData + c_nChunkSize)
+		if (!local)
+		{
+			*pGlobalDesc = Variant((const unsigned int)count);
+			--nChunkRemain;
+			++pLocalDesc;
+		}
+
+		if (nChunkRemain <= 0)
+		{
+			m_pCurrentChunk->pNext = new HeapChunk;
+			m_pCurrentChunk = m_pCurrentChunk->pNext;
+			pLocalDesc = m_pCurrentChunk->vData;
+			nChunkRemain = c_nChunkCapacity;
+		}
+
+		if (count < nChunkRemain)
+		{
+			*pLocalDesc = Variant((const unsigned int)count);
+			++nCountRemain;
+			
+			if (!local)
+			{
+				pGlobalDesc->pValue = pLocalDesc;
+			}
+		}
+		else
+		{
+			*pLocalDesc = Variant((const unsigned int)nChunkRemain);
+			nCountRemain -= nChunkRemain;
+
+			if (local)
+			{
+				pGlobalDesc = pLocalDesc;
+			}
+			else
+			{
+				pGlobalDesc->pValue = pLocalDesc;
+			}
+
+			for (; nCountRemain >= c_nChunkCapacity; nCountRemain -= c_nChunkCapacity)
+			{
+				m_pCurrentChunk->pNext = new HeapChunk;
+				m_pCurrentChunk = m_pCurrentChunk->pNext;
+				pLocalDesc->pValue = m_pCurrentChunk->vData;
+				pLocalDesc = m_pCurrentChunk->vData;
+				*pLocalDesc = Variant((const unsigned int)c_nChunkCapacity);
+			}
+
+			m_pCurrentChunk->pNext = new HeapChunk;
+			m_pCurrentChunk = m_pCurrentChunk->pNext;
+
+			if (nCountRemain > 0)
+			{
+				pLocalDesc->pValue = m_pCurrentChunk->vData;
+				pLocalDesc = m_pCurrentChunk->vData;
+				*pLocalDesc = Variant((const unsigned int)nCountRemain);
+				++nCountRemain;
+			}
+			else
+			{
+				pLocalDesc = m_pCurrentChunk->vData;
+			}
+		}
+
+		m_pCurrentSlot = pLocalDesc + nCountRemain;
+
+		return pGlobalDesc;
+	}
+
+	static inline Variant* HeapAllocStructArr(const unsigned short count)
+	{
+		const unsigned short size = 3;
+		Variant* pGlobalDesc = m_pCurrentSlot;
+		Variant* pLocalDesc = pGlobalDesc;
+		short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - pGlobalDesc - 1) / size;
+		unsigned short nCountRemain = count;
+
+		if (nChunkRemain <= 0)
+		{
+			m_pCurrentChunk->pNext = new HeapChunk;
+			m_pCurrentChunk = m_pCurrentChunk->pNext;
+			pLocalDesc = m_pCurrentChunk->vData;
+			nChunkRemain = c_nChunkSizeStruct;
+			pGlobalDesc = pLocalDesc;
+		}
+
+		if (count < nChunkRemain)
+		{
+			*pLocalDesc = Variant((unsigned int)count);
+			nCountRemain = nCountRemain * size + 1;
+		}
+		else
+		{
+			*pLocalDesc = Variant((const unsigned int)nChunkRemain);
+			nCountRemain -= nChunkRemain;
+
+			for (; nCountRemain >= c_nChunkSizeStruct; nCountRemain -= c_nChunkSizeStruct)
+			{
+				m_pCurrentChunk->pNext = new HeapChunk;
+				m_pCurrentChunk = m_pCurrentChunk->pNext;
+				pLocalDesc->pValue = m_pCurrentChunk->vData;
+				pLocalDesc = m_pCurrentChunk->vData;
+				*pLocalDesc = Variant((const unsigned int)c_nChunkSizeStruct);
+			}
+
+			m_pCurrentChunk->pNext = new HeapChunk;
+			m_pCurrentChunk = m_pCurrentChunk->pNext;
+
+			if (nCountRemain > 0)
+			{
+				pLocalDesc->pValue = m_pCurrentChunk->vData;
+				pLocalDesc = m_pCurrentChunk->vData;
+				*pLocalDesc = Variant((const unsigned int)nCountRemain);
+				nCountRemain = nCountRemain * size + 1;
+			}
+			else
+			{
+				pLocalDesc = m_pCurrentChunk->vData;
+			}
+		}
+
+		m_pCurrentSlot = pLocalDesc + nCountRemain;
+
+		return pGlobalDesc;
+	}
+
+	static inline Variant* HeapAllocStruct()
+	{
+		const unsigned short size = 3;
+		const unsigned short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - m_pCurrentSlot);
+		Variant* p = m_pCurrentSlot;
+
+		if (nChunkRemain < size)
+		{
+			m_pCurrentChunk->pNext = new HeapChunk;
+			m_pCurrentChunk = m_pCurrentChunk->pNext;
+			p = m_pCurrentChunk->vData;
+			m_pCurrentSlot = p + size;
+		}
+		else if (nChunkRemain == size)
 		{
 			m_pCurrentChunk->pNext = new HeapChunk;
 			m_pCurrentChunk = m_pCurrentChunk->pNext;
 			m_pCurrentSlot = m_pCurrentChunk->vData;
 		}
-
-		Variant* p = m_pCurrentSlot;
-		m_pCurrentSlot = m_pCurrentSlot + count + 1;
+		else
+		{
+			m_pCurrentSlot += size;
+		}
 
 		return p;
-	}
-
-	static inline void HeapChangeRefs(Variant* from, Variant* to)
-	{
-		for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
-		{
-			HeapChangeRefs(sp, from, to);
-		}
 	}
 
 	static inline bool Run(byte* program);
@@ -90,14 +225,16 @@ public:
 private:
 	VirtualMachine();
 
-	static const int c_nChunkSize = 64;
-	static const unsigned short c_bReplaced = 0x7FF1;
+	static const unsigned short c_nChunkSize = 511;
+	static const unsigned short c_nChunkCapacity = 510;
+	static const unsigned short c_nChunkSizeStruct = 170;
 
 	static inline void Resize();
 
 	static inline void HeapCollect();
+	static inline void CheckReferences(Variant* from, Variant* to);
 	static void HeapMove(Variant* from, Variant* to);
-	static void HeapChangeRefs(Variant* var, Variant* from, Variant* to);
+	static inline void DictEntryMove(Variant* from, Variant* to, Bucket** newBucket);
 
 	static Variant* m_pStack;
 	static int m_nCapacity;
@@ -106,8 +243,8 @@ private:
 
 	struct HeapChunk
 	{
-		HeapChunk* pNext = nullptr;
 		Variant vData[c_nChunkSize];
+		HeapChunk* pNext = nullptr;
 
 		~HeapChunk();
 	};
