@@ -116,28 +116,32 @@ Variant Variant::FromBytes(byte** pc)
 		}
 		else if (var.usType == VarType::DICT)
 		{
-			const unsigned int capacity = length << 1;
-			Variant* dict = VirtualMachine::HeapAlloc(capacity + 1);
-			*(dict++) = Variant((const unsigned int)length);
+			const unsigned short length = var.usLength;
+			const unsigned short cap = GetPrime(length);
+			Variant* dict = VirtualMachine::HeapAlloc(cap + 1);
+			*(dict++) = Variant((const unsigned int)cap);
 
 			for (unsigned short i = 0; i < length; ++i)
 			{
 				Variant key = Variant::FromBytes(pc);
-				const unsigned int index = key.GetHash(length) << 1;
-				Variant* cell = dict + (index);
+				const unsigned short index = key.GetHash() % cap;
 
-				/*while (!(cell->usNull == c_null && cell->pValue))
+				Variant* cell = dict + index;
+				Bucket* bucket = (Bucket*)VirtualMachine::HeapAlloc(3);
+				bucket->key = key;
+				bucket->value = Variant::FromBytes(pc);
+
+				if (cell->pValue == nullptr)
 				{
-					cell += 2;
-
-					if (cell >= dict + capacity)
-					{
-						cell = dict;
-					}
-				}*/
-
-				*cell = key;
-				*(++cell) = Variant::FromBytes(pc);
+					cell->lValue = 0;
+					cell->pValue = bucket;
+				}
+				else
+				{
+					bucket->next.pValue = cell->pValue;
+					++cell->lValue;
+					cell->pValue = bucket;
+				}
 			}
 
 			var.pValue = dict;
@@ -268,6 +272,33 @@ void Variant::PushBack(Variant* var)
 		}
 
 		*(p + 1 + length) = *var;
+	}
+
+	++usLength;
+}
+
+void Variant::Insert(Variant* key, Variant* val)
+{
+	const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
+	unsigned short index = key->GetHash() % capacity;
+
+	Variant* entry = (Variant*)Get(index);
+	//if entry->lValue more then trashhold constante, hash would be resized
+	
+	Bucket* bucket = (Bucket*)VirtualMachine::HeapAlloc(3);
+	bucket->key = *key;
+	bucket->value = *val;
+
+	if (entry->pValue == nullptr)
+	{
+		entry->lValue = 0;
+		entry->pValue = bucket;
+	}
+	else
+	{
+		bucket->next.pValue = entry->pValue;
+		++entry->lValue;
+		entry->pValue = bucket;
 	}
 
 	++usLength;

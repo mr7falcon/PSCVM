@@ -374,7 +374,14 @@ bool VirtualMachine::Run(byte* program)
 			Log("AFETCH " + std::to_string(offset) + " " + std::to_string(index));
 #endif
 
-			*m_sp = (m_bp - offset)->ArrGet(index);
+			Variant* arr = m_bp - offset;
+			if (index >= arr->usLength)
+			{
+				//throw any exception
+			}
+			Variant* var = arr->Get(index);
+			var->Copy();
+			*m_sp = *var;
 		}
 		break;
 		case ByteCommand::ASTORE:
@@ -389,7 +396,12 @@ bool VirtualMachine::Run(byte* program)
 			Log("ASTORE " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
 #endif
 
-			(m_pStack + m_nCapacity - offset)->ArrSet(index, m_sp++);
+			Variant* arr = m_pStack + m_nCapacity - offset;
+			if (index >= arr->usLength)
+			{
+				//throw any exception
+			}
+			*(arr->Get(index)) = *(m_sp++);
 		}
 		break;
 		case ByteCommand::APUSH:
@@ -413,9 +425,10 @@ bool VirtualMachine::Run(byte* program)
 			Log("DFETCH " + std::to_string(offset) + " " + m_sp->ToString());
 #endif
 
-			Variant val = (m_bp - offset)->DictGet(m_sp);
+			Variant* val = (m_bp - offset)->Find(m_sp);
+			val->Copy();
 			m_sp->Free();
-			*m_sp = val;
+			*m_sp = *val;
 		}
 		break;
 		case ByteCommand::DSTORE:
@@ -429,7 +442,7 @@ bool VirtualMachine::Run(byte* program)
 			Log("DSTORE " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + key->ToString());
 #endif
 
-			(m_pStack + m_nCapacity - offset)->DictSet(key, m_sp++);
+			*((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
 			key->Free();
 		}
 		break;
@@ -488,7 +501,7 @@ bool VirtualMachine::Run(byte* program)
 			Log("ARR " + std::to_string(len));
 #endif
 
-			const short int capacity = len + (len >> Variant::c_capInc);
+			const unsigned short capacity = len + (len >> Variant::c_capInc);
 			Variant* arr = VirtualMachine::HeapAlloc(capacity + 2);
 			Variant* pLocalDesc = arr + 1;
 			*pLocalDesc = Variant((const unsigned int)capacity);
@@ -521,7 +534,12 @@ bool VirtualMachine::Run(byte* program)
 			Log("DICT " + std::to_string(len));
 #endif
 
-			* m_sp = Variant::DictCreate(len);
+			const unsigned short capacity = GetPrime(len + (len >> Variant::c_capInc));
+			Variant* dict = VirtualMachine::HeapAlloc(capacity + 2);
+			Variant* pLocalDesc = dict + 1;
+			*pLocalDesc = Variant((const unsigned int)capacity);
+			*dict = Variant(capacity, pLocalDesc);
+			*m_sp = Variant(dict, len, VarType::ARR);
 		}
 		break;
 		case ByteCommand::FDICTIONARY:
@@ -534,7 +552,10 @@ bool VirtualMachine::Run(byte* program)
 			Log("FDICT " + std::to_string(len));
 #endif
 
-			*m_sp = Variant::DictCreate(len, true);
+			const unsigned short cap = GetPrime(len);
+			Variant* dict = VirtualMachine::HeapAlloc(cap + 1);
+			*dict = Variant((const unsigned int)cap);
+			*m_sp = Variant(dict, len, VarType::ARR);
 		}
 		break;
 		case ByteCommand::PUSH:

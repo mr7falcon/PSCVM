@@ -59,7 +59,7 @@ public:
 	static inline void Initialize();
 	static inline void ShutDown();
 
-	static inline Variant* HeapAlloc(const unsigned int count = 1)
+	static inline Variant* HeapAlloc(const unsigned short count = 1)
 	{	
 		Variant* p = m_pCurrentSlot;
 		const unsigned short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - p);
@@ -68,7 +68,7 @@ public:
 		if (nCountRemain > nChunkRemain)
 		{
 			nCountRemain -= nChunkRemain;
-			const unsigned int chunks = nChunkRemain / c_nChunkSize + 1;
+			const unsigned short chunks = nChunkRemain / c_nChunkSize + 1;
 			for (unsigned int i = 0; i < chunks; ++i)
 			{
 				m_pCurrentChunk->pNext = new HeapChunk;
@@ -77,7 +77,7 @@ public:
 			nCountRemain %= c_nChunkSize;
 		}
 
-		m_pCurrentSlot = m_pCurrentSlot + nCountRemain + 1;
+		m_pCurrentSlot = m_pCurrentChunk->vData + nCountRemain + 1;
 
 		return p;
 	}

@@ -8,6 +8,13 @@ typedef unsigned char byte;
 
 class VirtualMachine;
 
+struct Bucket
+{
+	Variant key;
+	Variant value;
+	Variant next;
+};
+
 enum VarType : unsigned short
 {
 	STR,
@@ -52,6 +59,11 @@ struct Variant
 		  pValue(next)
 	{}
 
+	inline Variant(const long count, Bucket* bucket)
+		: lValue(count),
+		  pValue(bucket)
+	{}
+
 	~Variant();
 
 	inline void Free()
@@ -91,38 +103,8 @@ struct Variant
 		}
 	}
 
-	inline static Variant DictCreate(const unsigned short length, bool fixed = false)
+	inline Variant* Get(const unsigned short i) const
 	{
-		/*Variant* dict;
-
-		if (fixed)
-		{
-			const unsigned int realLen = (unsigned int)length << 1;
-			dict = VirtualMachine::HeapAlloc(realLen + 1);
-			*dict = Variant((const unsigned int)length);
-		}
-		else
-		{
-			const unsigned short capacity = length + (length >> Variant::c_capInc);
-			dict = VirtualMachine::HeapAlloc((capacity << 1) + 2);
-			Variant* pLocalDesc = dict + 1;
-			*pLocalDesc = Variant((unsigned int)capacity);
-			*dict = Variant(capacity, pLocalDesc);
-		}
-
-		return Variant(dict, length, VarType::DICT);*/
-		return Variant();
-	}
-
-	inline Variant ArrGet(const unsigned short i) const
-	{
-		if (i >= usLength)
-		{
-			//throw some exception
-		}
-
-		Variant* var;
-
 		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
 		{
 			unsigned short index = i;
@@ -131,148 +113,39 @@ struct Variant
 				index -= (unsigned short)p->nCap;
 				p = (Variant*)p->pValue;
 			}
-			var = p + 1 + index;
+			return p + 1 + index;
 		}
 		else
 		{
-			var = (Variant*)pValue + 1 + i;
-		}
-
-		var->Copy();
-		return *var;
-	}
-
-	inline void ArrSet(const unsigned short i, Variant* var)
-	{
-		if (i >= usLength)
-		{
-			//throw some exception
-		}
-
-		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
-		{
-			unsigned short index = i;
-			while (index >= (unsigned short)p->nCap)
-			{
-				index -= (unsigned short)p->nCap;
-				p = (Variant*)p->pValue;
-			}
-			*(p + 1 + index) = *var;
-		}
-		else
-		{
-			*((Variant*)pValue + 1 + i) = *var;
+			return (Variant*)pValue + 1 + i;
 		}
 	}
 
 	void PushBack(Variant* var); //better to be inline but cant be that with VM methods
 
-	inline Variant DictGet(Variant* key) const
+	inline Variant* Find(Variant* key) const
 	{
 		const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
-		unsigned short index = key->GetHash(capacity);
-		const unsigned int pos = (unsigned int)index << 1;
+		unsigned short index = key->GetHash() % capacity;
 
-		Variant* cell;
+		Bucket* bucket = (Bucket*)Get(index)->pValue;
 
-		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
+		while (bucket)
 		{
-			while (index >= (unsigned short)p->nCap)
+			if (Equal(key, &bucket->key))
 			{
-				index -= (unsigned short)p->nCap;
-				p = (Variant*)p->pValue;
+				return &bucket->value;
 			}
-			cell = p + 1 + pos;
-		}
-		else
-		{
-			cell = (Variant*)pValue + 1 + pos;
+
+			bucket = (Bucket*)bucket->next.pValue;
 		}
 
-		//while (!Equal(key, cell))
-		//{
-		//	cell += 2;
-
-		//	if (cell->usNull == c_null && cell->pValue)
-		//	{
-		//		//key is missing, throw any exception
-		//	}
-
-		//	if (cell >= (Variant*)pValue + capacity)
-		//	{
-		//		cell = (Variant*)pValue;
-		//	}
-		//}
-
-		(++cell)->Copy();
-		return *cell;
+		//key is missing - throw any exception
 	}
 
-	inline void DictSet(Variant* key, Variant* val)
-	{
-		const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
-		unsigned short index = key->GetHash(capacity);
-		const unsigned int pos = (unsigned int)index << 1;
+	void Insert(Variant* key, Variant* val);	//same as PushBack
 
-		Variant* cell;
-
-		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
-		{
-			while (index >= (unsigned short)p->nCap)
-			{
-				index -= (unsigned short)p->nCap;
-				p = (Variant*)p->pValue;
-			}
-			cell = p + 1 + pos;
-		}
-		else
-		{
-			cell = (Variant*)pValue + 1 + pos;
-		}
-
-		//while (!Equal(key, cell))
-		//{
-		//	cell += 2;
-
-		//	if (cell->usNull == c_null && cell->pValue)
-		//	{
-		//		//key is missing, throw any exception
-		//	}
-
-		//	if (cell >= (Variant*)pValue + capacity)
-		//	{
-		//		cell = (Variant*)pValue;
-		//	}
-		//}
-
-		*(++cell) = *val;
-	}
-
-	inline void Insert(Variant* key, Variant* val)
-	{
-		++usLength;
-		const unsigned int len = usLength << 1;
-		const unsigned int capacity = (unsigned int)((Variant*)pValue - 1)->dValue;
-		if (len > capacity)
-		{
-			//throw any exception, i think
-		}
-
-		const unsigned int index = key->GetHash(capacity) << 1;
-		Variant* cell = (Variant*)pValue + index;
-
-		while (!(cell->usNull == c_null && cell->pValue))
-		{
-			cell += 2;
-
-			if (cell >= (Variant*)pValue + capacity)
-			{
-				cell = (Variant*)pValue;
-			}
-		}
-	}
-
-	inline const unsigned short GetHash(const unsigned int cap) const
+	inline const long GetHash() const
 	{
 		long res = lValue;
 
@@ -280,22 +153,23 @@ struct Variant
 		{
 			if (usType == VarType::STR)
 			{
-				for (char* c = (char*)pValue; c < (char*)pValue + usLength; ++c)
+				/*for (char* c = (char*)pValue; c < (char*)pValue + usLength; ++c)
 				{
 					res -= *c;
-				}
+				}*/
+				res -= (long)pValue;
 			}
 			else if (usType == VarType::ARR)
 			{
-				//ToDo
+				res -= (long)pValue;
 			}
 			else if (usType == VarType::DICT)
 			{
-				//ToDo
+				res -= (long)pValue;
 			}
 		}
 
-		return (const unsigned short)(res % cap);
+		return res;
 	}
 
 	static bool Equal(Variant* op1, Variant* op2);
@@ -325,3 +199,21 @@ struct Variant
 
 	void* pValue;
 };
+
+const unsigned short c_primes[] = { 3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353,
+	431, 521, 631, 761, 919, 1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
+	17519, 21023, 25229, 30293, 36353, 43627, 52361, 62851 };
+
+inline const unsigned short GetPrime(const unsigned short num)
+{
+	for (int i = 0; i < 42; ++i)
+	{
+		const unsigned short prime = *(c_primes + i);
+		if (prime > num)
+		{
+			return prime;
+		}
+	}
+
+	return USHRT_MAX;
+}
