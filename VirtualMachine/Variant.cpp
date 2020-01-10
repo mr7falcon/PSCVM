@@ -19,7 +19,11 @@ const string Variant::ToString() const
 		str.resize((size_t)usLength + 2);
 		return str;
 	}
-	else if (usType == VarType::ARR)
+	else if (!pValue)
+	{
+		return "NULL";
+	}
+	else
 	{
 		Variant* pGlobalDesc = (Variant*)pValue;
 		string str = "{";
@@ -28,59 +32,100 @@ const string Variant::ToString() const
 		{
 			unsigned short length = usLength;
 			Variant* arr = pLocalDesc + 1;
-			str += (arr++)->ToString();
 
-			while (pLocalDesc->pValue)
+			if (usType == VarType::ARR)
 			{
-				const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
-
-				for (; arr <= pLocalDesc + capacity; ++arr)
+				while (pLocalDesc->pValue)
 				{
-					str = str + " | " + arr->ToString();
+					const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+					const Variant* stop = pLocalDesc + capacity;
+
+					for (; arr <= stop; ++arr)
+					{
+						str = str + arr->ToString() + " | ";
+					}
+
+					length -= capacity;
+					pLocalDesc = (Variant*)pLocalDesc->pValue;
+					arr = pLocalDesc + 1;
 				}
 
-				length -= capacity;
-				pLocalDesc = (Variant*)pLocalDesc->pValue;
-				arr = pLocalDesc + 1;
-			}
+				const Variant* stop = pLocalDesc + length;
+				for (; arr <= stop; ++arr)
+				{
+					str = str + arr->ToString() + " | ";
+				}
 
-			for (; arr <= pLocalDesc + length; ++arr)
+				str[str.length() - 1] = '}';
+				return str;
+			}
+			else if (usType == VarType::DICT)
 			{
-				str = str + " | " + arr->ToString();
-			}
+				Bucket* bucket;
+				while (true)
+				{
+					const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+					const Variant* stop = pLocalDesc + capacity;
 
-			str += '}';
+					for (; arr <= stop; ++arr)
+					{
+						if (arr->pValue)
+						{
+							bucket = (Bucket*)arr->pValue;
+							while (bucket)
+							{
+								str = str + bucket->key.ToString() + " : " + bucket->value.ToString() + " | ";
+								bucket = (Bucket*)bucket->next.pValue;
+								if (--length == 0)
+								{
+									str[str.length() - 1] = '}';
+									return str;
+								}
+							}
+						}
+					}
+
+					pLocalDesc = (Variant*)pLocalDesc->pValue;
+					arr = pLocalDesc + 1;
+				}
+			}
 		}
 		else
 		{
-			Variant* arr = pGlobalDesc + 1;
-			str += (arr++)->ToString();
-
-			for (; arr <= pGlobalDesc + usLength; ++arr)
+			if (usType == VarType::ARR)
 			{
-				str = str + " | " + arr->ToString();
+				const Variant* stop = pGlobalDesc + usLength;
+				for (Variant* arr = pGlobalDesc + 1; arr <= stop; ++arr)
+				{
+					str = str + arr->ToString() + " | ";
+				}
+
+				str[str.length() - 1] = '}';
+				return str;
 			}
-
-			str += '}';
+			else if (usType == VarType::DICT)
+			{
+				Bucket* bucket = nullptr;
+				unsigned short length = usLength;
+				for (Variant* arr = pGlobalDesc + 1; ; ++arr)
+				{
+					if (arr->pValue)
+					{
+						bucket = (Bucket*)arr->pValue;
+						while (bucket)
+						{
+							str = str + bucket->key.ToString() + " : " + bucket->value.ToString() + " | ";
+							bucket = (Bucket*)bucket->next.pValue;
+							if (--length == 0)
+							{
+								str[str.length() - 1] = '}';
+								return str;
+							}
+						}
+					}
+				}
+			}
 		}
-
-		return str;
-	}
-	else if (usType == VarType::DICT)
-	{
-		Variant* p = (Variant*)pValue;
-		string str = '{' + (p++)->ToString() + " : " + (p++)->ToString();
-		const unsigned int len = usLength << 1;
-		while (p < (Variant*)pValue + len)
-		{
-			str = str + " | " + (p++)->ToString() + " : " + (p++)->ToString();
-		}
-		str += '}';
-		return str;
-	}
-	else if (!pValue)
-	{
-		return "NULL";
 	}
 
 	return "";
@@ -120,6 +165,7 @@ Variant Variant::FromBytes(byte** pc)
 			const unsigned short cap = GetPrime(length);
 			Variant* dict = VirtualMachine::HeapAlloc(cap + 1);
 			*(dict++) = Variant((const unsigned int)cap);
+			Bucket* bucket = (Bucket*)VirtualMachine::HeapAlloc(3 * length);
 
 			for (unsigned short i = 0; i < length; ++i)
 			{
@@ -127,13 +173,12 @@ Variant Variant::FromBytes(byte** pc)
 				const unsigned short index = key.GetHash() % cap;
 
 				Variant* cell = dict + index;
-				Bucket* bucket = (Bucket*)VirtualMachine::HeapAlloc(3);
 				bucket->key = key;
 				bucket->value = Variant::FromBytes(pc);
 
 				if (cell->pValue == nullptr)
 				{
-					cell->lValue = 0;
+					cell->lValue = 1;
 					cell->pValue = bucket;
 				}
 				else
@@ -142,6 +187,8 @@ Variant Variant::FromBytes(byte** pc)
 					++cell->lValue;
 					cell->pValue = bucket;
 				}
+
+				++bucket;
 			}
 
 			var.pValue = dict;
@@ -157,83 +204,128 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	{
 		return op1->dValue == op2->dValue;
 	}
-	else if (op1->usType == VarType::STR && op2->usType == VarType::STR)
-	{
-
-		if (op1->usLength != op2->usLength)
-		{
-			return false;
-		}
-
-		for (unsigned short i = 0; i < op1->usLength; ++i)
-		{
-			if (((char*)op1->pValue + i) != ((char*)op2->pValue + i))
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
-	else if (op1->usType == VarType::ARR && op2->usType == VarType::ARR)
-	{
-		if (op1->usLength != op2->usLength)
-		{
-			return false;
-		}
-
-		Variant* pGlobalDesc1 = (Variant*)op1->pValue;
-		Variant* pGlobalDesc2 = (Variant*)op2->pValue;
-		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
-		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
-		Variant* pArr1 = pLocalDesc1 ? pLocalDesc1 + 1 : pGlobalDesc1 + 1;
-		Variant* pArr2 = pLocalDesc2 ? pLocalDesc2 + 1 : pGlobalDesc2 + 1;
-
-		for (unsigned short i = 0; i < op1->usLength; ++i)
-		{
-			if (pLocalDesc1 && pArr1 == pLocalDesc1 + (unsigned short)pLocalDesc1->nCap + 1)
-			{
-				pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
-				pArr1 = pLocalDesc1 + 1;
-			}
-
-			if (pLocalDesc2 && pArr2 == pLocalDesc2 + (unsigned short)pLocalDesc2->nCap + 1)
-			{
-				pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
-				pArr2 = pLocalDesc2 + 1;
-			}
-
-			if (!Equal(pArr1, pArr2))
-			{
-				return false;
-			}
-
-			++pArr1;
-			++pArr2;
-		}
-
-		return true;
-	}
-	else if (op1->usType == VarType::DICT && op2->usType == VarType::DICT)
-	{
-		if (op1->usLength != op2->usLength)
-		{
-			return false;
-		}
-
-		for (unsigned int i = 0; i < ((unsigned int)op1->usLength << 1); ++i)
-		{
-			if (!Equal((Variant*)op1->pValue + i, (Variant*)op2->pValue + i))
-			{
-				return false;
-			}
-		}
-
-		return true;
-	}
 	else
 	{
-		return false;
+		unsigned short type = op1->usType;
+		
+		if (type != op2->usType)
+		{
+			return false;
+		}
+
+		if (!op1->pValue || !op2->pValue)
+		{
+			return false;
+		}
+
+		if (op1->usLength != op2->usLength)
+		{
+			return false;
+		}
+
+		if (type == VarType::STR)
+		{
+			for (unsigned short i = 0; i < op1->usLength; ++i)
+			{
+				if (((char*)op1->pValue + i) != ((char*)op2->pValue + i))
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+		else
+		{
+			Variant* pGlobalDesc1 = (Variant*)op1->pValue;
+			Variant* pGlobalDesc2 = (Variant*)op2->pValue;
+			Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
+			Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
+			Variant* pArr1 = pLocalDesc1 ? pLocalDesc1 + 1 : pGlobalDesc1 + 1;
+			Variant* pArr2 = pLocalDesc2 ? pLocalDesc2 + 1 : pGlobalDesc2 + 1;
+
+			if (type == VarType::ARR)
+			{
+				for (unsigned short i = 0; i < op1->usLength; ++i)
+				{
+					if (pLocalDesc1 && pArr1 == pLocalDesc1 + (unsigned short)pLocalDesc1->nCap + 1)
+					{
+						pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
+						pArr1 = pLocalDesc1 + 1;
+					}
+
+					if (pLocalDesc2 && pArr2 == pLocalDesc2 + (unsigned short)pLocalDesc2->nCap + 1)
+					{
+						pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+						pArr2 = pLocalDesc2 + 1;
+					}
+
+					if (!Equal(pArr1, pArr2))
+					{
+						return false;
+					}
+
+					++pArr1;
+					++pArr2;
+				}
+
+				return true;
+			}
+			else if (type == VarType::DICT)
+			{
+				Bucket* bucket1 = nullptr;
+				Bucket* bucket2 = nullptr;
+
+				for (unsigned short i = 0; i < op1->usLength; ++i)
+				{
+					while (!bucket1)
+					{
+						if (pLocalDesc1 && pArr1 == pLocalDesc1 + (unsigned short)pLocalDesc1->nCap + 1)
+						{
+							pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
+							pArr1 = pLocalDesc1 + 1;
+						}
+
+						if (pArr1->pValue)
+						{
+							bucket1 = (Bucket*)pArr1->pValue;
+						}
+						else
+						{
+							++pArr1;
+						}
+					}
+
+					while (!bucket2)
+					{
+						if (pLocalDesc2 && pArr2 == pLocalDesc2 + (unsigned short)pLocalDesc2->nCap + 1)
+						{
+							pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+							pArr2 = pLocalDesc2 + 1;
+						}
+
+						if (pArr2->lValue > 0)
+						{
+							bucket2 = (Bucket*)pArr2->pValue;
+						}
+						else
+						{
+							++pArr2;
+						}
+					}
+
+					if (!Equal(&bucket1->key, &bucket2->key) || !Equal(&bucket1->value, &bucket2->value))
+					{
+						return false;
+					}
+
+					bucket1 = (Bucket*)bucket1->next.pValue;
+					bucket2 = (Bucket*)bucket2->next.pValue;
+				}
+			}
+
+			return false;
+		}
 	}
 }
 
@@ -291,7 +383,7 @@ void Variant::Insert(Variant* key, Variant* val)
 
 	if (entry->pValue == nullptr)
 	{
-		entry->lValue = 0;
+		entry->lValue = 1;
 		entry->pValue = bucket;
 	}
 	else
@@ -302,4 +394,24 @@ void Variant::Insert(Variant* key, Variant* val)
 	}
 
 	++usLength;
+}
+
+Variant* Variant::Find(Variant* key) const
+{
+	const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
+	unsigned short index = key->GetHash() % capacity;
+
+	Bucket* bucket = (Bucket*)Get(index)->pValue;
+
+	while (bucket)
+	{
+		if (Equal(key, &bucket->key))
+		{
+			return &bucket->value;
+		}
+
+		bucket = (Bucket*)bucket->next.pValue;
+	}
+
+	//key is missing - throw any exception
 }

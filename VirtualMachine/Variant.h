@@ -7,13 +7,7 @@ using std::string;
 typedef unsigned char byte;
 
 class VirtualMachine;
-
-struct Bucket
-{
-	Variant key;
-	Variant value;
-	Variant next;
-};
+struct Bucket;
 
 enum VarType : unsigned short
 {
@@ -57,11 +51,6 @@ struct Variant
 		: nCap(cap),
 		  nReplaced(0),
 		  pValue(next)
-	{}
-
-	inline Variant(const long count, Bucket* bucket)
-		: lValue(count),
-		  pValue(bucket)
 	{}
 
 	~Variant();
@@ -123,31 +112,13 @@ struct Variant
 
 	void PushBack(Variant* var); //better to be inline but cant be that with VM methods
 
-	inline Variant* Find(Variant* key) const
-	{
-		const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
-		unsigned short index = key->GetHash() % capacity;
-
-		Bucket* bucket = (Bucket*)Get(index)->pValue;
-
-		while (bucket)
-		{
-			if (Equal(key, &bucket->key))
-			{
-				return &bucket->value;
-			}
-
-			bucket = (Bucket*)bucket->next.pValue;
-		}
-
-		//key is missing - throw any exception
-	}
+	Variant* Find(Variant* key) const;		//same with Bucket
 
 	void Insert(Variant* key, Variant* val);	//same as PushBack
 
-	inline const long GetHash() const
+	inline const long long GetHash() const
 	{
-		long res = lValue;
+		long long res = (long long)0 - (long long)lValue;
 
 		if (usNull == c_null)
 		{
@@ -157,15 +128,15 @@ struct Variant
 				{
 					res -= *c;
 				}*/
-				res -= (long)pValue;
+				res += (long long)pValue;
 			}
 			else if (usType == VarType::ARR)
 			{
-				res -= (long)pValue;
+				res += (long long)pValue;
 			}
 			else if (usType == VarType::DICT)
 			{
-				res -= (long)pValue;
+				res += (long long)pValue;
 			}
 		}
 
@@ -198,6 +169,13 @@ struct Variant
 	};
 
 	void* pValue;
+};
+
+struct Bucket
+{
+	Variant key;
+	Variant value;
+	Variant next;
 };
 
 const unsigned short c_primes[] = { 3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353,

@@ -95,7 +95,9 @@ private:
 	static inline void Resize();
 
 	static inline void HeapCollect();
+	static inline void CheckReferences(Variant* from, Variant* to);
 	static void HeapMove(Variant* from, Variant* to);
+	static inline void DictEntryMove(Variant* from, Variant* to, Bucket** newBucket);
 
 	static Variant* m_pStack;
 	static int m_nCapacity;
