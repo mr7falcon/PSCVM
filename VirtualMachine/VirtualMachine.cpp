@@ -15,7 +15,7 @@ std::ofstream VirtualMachine::log;
 
 void VirtualMachine::Initialize()
 {
-	m_nCapacity = 64;
+	m_nCapacity = 8;
 	m_pStack = new Variant[m_nCapacity];
 	m_sp = m_pStack + m_nCapacity;
 	m_bp = m_pStack - 1;
@@ -72,7 +72,7 @@ inline void VirtualMachine::Resize()
 void VirtualMachine::DictEntryMove(Variant* from, Variant* to, Bucket** newBucket)
 {
 	Bucket* pBucket;
-	Bucket* pNewBucket = *newBucket;
+	Bucket* pNewBucket;
 
 	if (from->pValue)
 	{
@@ -82,31 +82,33 @@ void VirtualMachine::DictEntryMove(Variant* from, Variant* to, Bucket** newBucke
 
 		while (pBucket)
 		{
+			pNewBucket = *newBucket;
 			HeapMove(&pBucket->key, &pNewBucket->key);
 			HeapMove(&pBucket->value, &pNewBucket->value);
-			*prev = pBucket;
+			*prev = pNewBucket;
 			pBucket = (Bucket*)pBucket->next.pValue;
 			prev = &pNewBucket->next.pValue;
-			*newBucket = pNewBucket + 1;
+			++(*newBucket);
 		}
 	}
 }
 
 void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 {
-	if (from->usNull == Variant::c_null)
+	Variant* pValue = (Variant*)from->pValue;
+	if (pValue)
 	{
 		const unsigned short type = from->usType;
 
 		if (type == VarType::STR)
 		{
-			to->pValue = from->pValue;
+			to->pValue = pValue;
 			return;
 		}
 
-		if (!((Variant*)from->pValue)->nReplaced)
+		if (!pValue->nReplaced)
 		{
-			Variant* pGlobDesc = (Variant*)from->pValue;
+			Variant* pGlobDesc = pValue;
 			const unsigned short capacity = pGlobDesc->nCap;
 
 			if (pGlobDesc->pValue)
@@ -190,7 +192,7 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 		}
 		else
 		{
-			to->pValue = ((Variant*)from->pValue)->pValue;
+			to->pValue = pValue->pValue;
 		}
 	}
 }
@@ -336,7 +338,7 @@ bool VirtualMachine::Run(byte* program)
 			Log("AFETCH " + std::to_string(offset) + " " + std::to_string(index));
 #endif
 
-			Variant* arr = m_bp - offset;
+			Variant* arr = m_pStack + m_nCapacity - offset;
 			if (index >= arr->usLength)
 			{
 				//throw any exception
@@ -387,7 +389,7 @@ bool VirtualMachine::Run(byte* program)
 			Log("DFETCH " + std::to_string(offset) + " " + m_sp->ToString());
 #endif
 
-			Variant* val = (m_bp - offset)->Find(m_sp);
+			Variant* val = (m_pStack + m_nCapacity - offset)->Find(m_sp);
 			val->Copy();
 			m_sp->Free();
 			*m_sp = *val;
@@ -416,11 +418,10 @@ bool VirtualMachine::Run(byte* program)
 			Variant* key = m_sp;
 
 #ifdef _DEBUG
-			Log("DINSERT " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+			Log("DINS " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + key->ToString());
 #endif
 
 			(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++);
-			key->Free();
 		}
 		break;
 		case ByteCommand::LALLOC:
@@ -501,7 +502,7 @@ bool VirtualMachine::Run(byte* program)
 			Variant* pLocalDesc = dict + 1;
 			*pLocalDesc = Variant((const unsigned int)capacity);
 			*dict = Variant(capacity, pLocalDesc);
-			*m_sp = Variant(dict, len, VarType::ARR);
+			*m_sp = Variant(dict, 0, VarType::DICT);
 		}
 		break;
 		case ByteCommand::FDICTIONARY:
@@ -517,7 +518,7 @@ bool VirtualMachine::Run(byte* program)
 			const unsigned short cap = GetPrime(len);
 			Variant* dict = VirtualMachine::HeapAlloc(cap + 1);
 			*dict = Variant((const unsigned int)cap);
-			*m_sp = Variant(dict, len, VarType::ARR);
+			*m_sp = Variant(dict, 0, VarType::DICT);
 		}
 		break;
 		case ByteCommand::PUSH:

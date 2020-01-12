@@ -75,9 +75,12 @@ public:
 				m_pCurrentChunk = m_pCurrentChunk->pNext;
 			}
 			nCountRemain %= c_nChunkSize;
+			m_pCurrentSlot = m_pCurrentChunk->vData + nCountRemain;
 		}
-
-		m_pCurrentSlot = m_pCurrentChunk->vData + nCountRemain + 1;
+		else
+		{
+			m_pCurrentSlot += nCountRemain;
+		}
 
 		return p;
 	}

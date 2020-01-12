@@ -116,9 +116,9 @@ struct Variant
 
 	void Insert(Variant* key, Variant* val);	//same as PushBack
 
-	inline const long long GetHash() const
+	inline const long GetHash() const
 	{
-		long long res = (long long)0 - (long long)lValue;
+		long res = lValue;
 
 		if (usNull == c_null)
 		{
@@ -128,15 +128,12 @@ struct Variant
 				{
 					res -= *c;
 				}*/
-				res += (long long)pValue;
 			}
 			else if (usType == VarType::ARR)
 			{
-				res += (long long)pValue;
 			}
 			else if (usType == VarType::DICT)
 			{
-				res += (long long)pValue;
 			}
 		}
 

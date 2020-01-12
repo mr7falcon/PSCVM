@@ -51,12 +51,13 @@ const string Variant::ToString() const
 				}
 
 				const Variant* stop = pLocalDesc + length;
+				str = str + (arr++)->ToString();
 				for (; arr <= stop; ++arr)
 				{
-					str = str + arr->ToString() + " | ";
+					str = str + " | " + arr->ToString();
 				}
 
-				str[str.length() - 1] = '}';
+				str += '}';
 				return str;
 			}
 			else if (usType == VarType::DICT)
@@ -74,12 +75,16 @@ const string Variant::ToString() const
 							bucket = (Bucket*)arr->pValue;
 							while (bucket)
 							{
-								str = str + bucket->key.ToString() + " : " + bucket->value.ToString() + " | ";
+								str = str + bucket->key.ToString() + " : " + bucket->value.ToString();
 								bucket = (Bucket*)bucket->next.pValue;
 								if (--length == 0)
 								{
-									str[str.length() - 1] = '}';
+									str += '}';
 									return str;
+								}
+								else
+								{
+									str += " | ";
 								}
 							}
 						}
@@ -95,12 +100,14 @@ const string Variant::ToString() const
 			if (usType == VarType::ARR)
 			{
 				const Variant* stop = pGlobalDesc + usLength;
-				for (Variant* arr = pGlobalDesc + 1; arr <= stop; ++arr)
+				Variant* arr = pGlobalDesc + 1;
+				str = str + (arr++)->ToString();
+				for (; arr <= stop; ++arr)
 				{
-					str = str + arr->ToString() + " | ";
+					str = str + " | " + arr->ToString();
 				}
 
-				str[str.length() - 1] = '}';
+				str += '}';
 				return str;
 			}
 			else if (usType == VarType::DICT)
@@ -114,12 +121,16 @@ const string Variant::ToString() const
 						bucket = (Bucket*)arr->pValue;
 						while (bucket)
 						{
-							str = str + bucket->key.ToString() + " : " + bucket->value.ToString() + " | ";
+							str = str + bucket->key.ToString() + " : " + bucket->value.ToString();
 							bucket = (Bucket*)bucket->next.pValue;
 							if (--length == 0)
 							{
-								str[str.length() - 1] = '}';
+								str += '}';
 								return str;
+							}
+							else
+							{
+								str += " | ";
 							}
 						}
 					}
@@ -163,8 +174,9 @@ Variant Variant::FromBytes(byte** pc)
 		{
 			const unsigned short length = var.usLength;
 			const unsigned short cap = GetPrime(length);
-			Variant* dict = VirtualMachine::HeapAlloc(cap + 1);
-			*(dict++) = Variant((const unsigned int)cap);
+			Variant* pGlobalDesc = VirtualMachine::HeapAlloc(cap + 1);
+			*pGlobalDesc = Variant((const unsigned int)cap);
+			Variant* dict = pGlobalDesc + 1;
 			Bucket* bucket = (Bucket*)VirtualMachine::HeapAlloc(3 * length);
 
 			for (unsigned short i = 0; i < length; ++i)
@@ -191,7 +203,7 @@ Variant Variant::FromBytes(byte** pc)
 				++bucket;
 			}
 
-			var.pValue = dict;
+			var.pValue = pGlobalDesc;
 		}
 	}
 
@@ -227,7 +239,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 		{
 			for (unsigned short i = 0; i < op1->usLength; ++i)
 			{
-				if (((char*)op1->pValue + i) != ((char*)op2->pValue + i))
+				if (*((char*)op1->pValue + i) != *((char*)op2->pValue + i))
 				{
 					return false;
 				}
