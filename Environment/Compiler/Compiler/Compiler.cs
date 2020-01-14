@@ -40,12 +40,10 @@ namespace Compiler
             JMP,
             HALT,
             ARRAY,
-            FARRAY,
             ASTORE,
             AFETCH,
             APUSH,
             DICTIONARY,
-            FDICTIONARY,
             DSTORE,
             DFETCH,
             DINSERT,
@@ -307,14 +305,8 @@ namespace Compiler
                     case "ARR":
                         byteCode.Add((byte)ByteCommand.ARRAY);
                         break;
-                    case "FARR":
-                        byteCode.Add((byte)ByteCommand.FARRAY);
-                        break;
                     case "DICT":
                         byteCode.Add((byte)ByteCommand.DICTIONARY);
-                        break;
-                    case "FDICT":
-                        byteCode.Add((byte)ByteCommand.FDICTIONARY);
                         break;
                     case "DINS":
                         byteCode.Add((byte)ByteCommand.DINSERT);

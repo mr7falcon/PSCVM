@@ -94,20 +94,14 @@ struct Variant
 
 	inline Variant* Get(const unsigned short i) const
 	{
-		if (Variant* p = (Variant*)((Variant*)pValue)->pValue)
+		Variant* p = (Variant*)((Variant*)pValue)->pValue;
+		unsigned short index = i;
+		while (index >= (unsigned short)p->nCap)
 		{
-			unsigned short index = i;
-			while (index >= (unsigned short)p->nCap)
-			{
-				index -= (unsigned short)p->nCap;
-				p = (Variant*)p->pValue;
-			}
-			return p + 1 + index;
+			index -= (unsigned short)p->nCap;
+			p = (Variant*)p->pValue;
 		}
-		else
-		{
-			return (Variant*)pValue + 1 + i;
-		}
+		return p + 1 + index;
 	}
 
 	void PushBack(Variant* var); //better to be inline but cant be that with VM methods
