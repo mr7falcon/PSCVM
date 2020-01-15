@@ -55,7 +55,19 @@ struct Variant
 
 	~Variant();
 
-	void Free();
+	inline void Free()
+	{
+		if (usNull == c_null && --usRef == 0)
+		{
+			if (usType == VarType::STR)
+			{
+				delete[]((char*)pValue);
+			}
+
+			usNull = c_null;
+			pValue = nullptr;
+		}
+	}
 
 	inline void Copy()
 	{
