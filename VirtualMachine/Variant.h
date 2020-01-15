@@ -55,34 +55,7 @@ struct Variant
 
 	~Variant();
 
-	inline void Free()
-	{
-		if (pValue && --usRef <= 0)
-		{
-			if (usType == VarType::STR)
-			{
-				delete[]((char*)pValue);
-			}
-			else if (usType == VarType::ARR)
-			{
-				for (Variant* p = (Variant*)pValue; p < (Variant*)pValue + usLength; ++p)
-				{
-					p->Free();
-				}
-			}
-			else if (usType == VarType::DICT)
-			{
-				const unsigned int len = usLength << 1;
-				for (Variant* p = (Variant*)pValue; p < (Variant*)pValue + len; ++p)
-				{
-					p->Free();
-				}
-			}
-
-			usNull = c_null;
-			pValue = nullptr;
-		}
-	}
+	void Free();
 
 	inline void Copy()
 	{

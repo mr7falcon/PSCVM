@@ -40,7 +40,7 @@ void VirtualMachine::ShutDown()
 		}
 	}
 
-	HeapChunk* iter = m_pFirstChunk;
+	HeapChunk* iter = m_pFirstChunk;	
 	while (iter)
 	{
 		HeapChunk* next = iter->pNext;
@@ -354,10 +354,10 @@ bool VirtualMachine::Run(byte* program)
 			pc += sizeof(int);
 
 			m_sp->Free();
-			const unsigned short index = (unsigned short)m_sp->dValue;
+			const unsigned short index = (unsigned short)(m_sp++)->dValue;
 
 #ifdef _DEBUG
-			Log("ASTORE " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
+			Log("ASTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
 #endif
 
 			Variant* arr = m_pStack + m_nCapacity - offset;
@@ -400,10 +400,10 @@ bool VirtualMachine::Run(byte* program)
 			const int offset = *((int*)pc);
 			pc += sizeof(int);
 
-			Variant* key = m_sp;
+			Variant* key = m_sp++;
 
 #ifdef _DEBUG
-			Log("DSTORE " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+			Log("DSTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
 #endif
 
 			*((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
@@ -415,10 +415,10 @@ bool VirtualMachine::Run(byte* program)
 			const int offset = *((int*)pc);
 			pc += sizeof(int);
 
-			Variant* key = m_sp;
+			Variant* key = m_sp++;
 
 #ifdef _DEBUG
-			Log("DINS " + (++m_sp)->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+			Log("DINS " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
 #endif
 
 			(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++);
@@ -849,7 +849,7 @@ extern "C"
 		VirtualMachine::Initialize();
 		bool bSuccsess = VirtualMachine::Run(program);
 		string sStack = VirtualMachine::GetStack();
-		//VirtualMachine::ShutDown();
+		VirtualMachine::ShutDown();
 		std::cout << sStack << std::endl;
 		return bSuccsess;
 	}
