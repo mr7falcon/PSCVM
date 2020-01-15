@@ -849,6 +849,7 @@ extern "C"
 		VirtualMachine::Initialize();
 		bool bSuccsess = VirtualMachine::Run(program);
 		string sStack = VirtualMachine::GetStack();
+		//VirtualMachine::ShutDown();
 		std::cout << sStack << std::endl;
 		return bSuccsess;
 	}

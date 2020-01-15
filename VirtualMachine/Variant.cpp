@@ -220,7 +220,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
 			Variant* pArr1 = pLocalDesc1 + 1;
 			Variant* pArr2 = pLocalDesc2 + 1;
-			Variant* stop1 = pArr2 + (unsigned short)pLocalDesc1->nCap;
+			Variant* stop1 = pArr1 + (unsigned short)pLocalDesc1->nCap;
 			Variant* stop2 = pArr2 + (unsigned short)pLocalDesc2->nCap;
 
 			if (type == VarType::ARR)
@@ -249,8 +249,6 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 					++pArr1;
 					++pArr2;
 				}
-
-				return true;
 			}
 			else if (type == VarType::DICT)
 			{
@@ -307,7 +305,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 				}
 			}
 
-			return false;
+			return true;
 		}
 	}
 }
@@ -393,4 +391,5 @@ Variant* Variant::Find(Variant* key) const
 	}
 
 	//key is missing - throw any exception
+	throw new std::exception("idi rabotay, suka!");
 }
