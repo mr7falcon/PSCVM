@@ -337,7 +337,7 @@ namespace Compiler
                 }
             }
 
-            using (FileStream fstream = new FileStream("../../../../Tests/" +
+            using (FileStream fstream = new FileStream("../../../../Tests/Byte/" +
                    Path.GetFileNameWithoutExtension(args[0]) + ".bpsc", FileMode.Create))
             {
                 fstream.Write(byteCode.ToArray(), 0, byteCode.Count);

@@ -106,19 +106,19 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 			return;
 		}
 
-		if (!pValue->nReplaced)
+		if (!pValue->usReplaced)
 		{
 			const unsigned short length = from->usLength;
 			Variant* pGlobDesc = pValue;
-			const unsigned short capacity = pGlobDesc->nCap;
+			const unsigned short capacity = pGlobDesc->usCap;
 			Variant* iter = HeapAlloc(capacity);
 			to->pValue = iter;
 			Variant* pIterLocalDesc = (Variant*)iter->pValue;
 			iter = pIterLocalDesc + 1;
-			Variant* iterStop = iter + (unsigned short)pIterLocalDesc->nCap;
+			Variant* iterStop = iter + pIterLocalDesc->usCap;
 			Variant* pLocalDesc = (Variant*)pGlobDesc->pValue;
 			Variant* pArr = pLocalDesc + 1;
-			Variant* stop = pArr + (unsigned short)pLocalDesc->nCap;
+			Variant* stop = pArr + pLocalDesc->usCap;
 
 			if (type == ARR)
 			{
@@ -128,14 +128,14 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 					{
 						pLocalDesc = (Variant*)pLocalDesc->pValue;
 						pArr = pLocalDesc + 1;
-						stop = pArr + (unsigned short)pLocalDesc->nCap;
+						stop = pArr + pLocalDesc->usCap;
 					}
 
 					if (iter == iterStop)
 					{
 						pIterLocalDesc = (Variant*)pIterLocalDesc->pValue;
 						iter = pLocalDesc + 1;
-						iterStop = iter + (unsigned short)pIterLocalDesc->nCap;
+						iterStop = iter + pIterLocalDesc->usCap;
 					}
 
 					HeapMove(pArr, iter);
@@ -146,14 +146,14 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 			else if (type == VarType::DICT)
 			{
 				Variant* pBucketDesc = HeapAllocStructArr(length);
-				unsigned short nBucketCap = (unsigned short)pBucketDesc->nCap;
+				unsigned short nBucketCap = pBucketDesc->usCap;
 				Bucket* pBucketArr = (Bucket*)(pBucketDesc + 1);
 				Bucket* pNewBucket = pBucketArr;
 				Bucket* pBucket;
 
 				while (pLocalDesc)
 				{
-					const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+					const unsigned short capacity = pLocalDesc->usCap;
 					
 					for (; pArr <= pLocalDesc + capacity; ++pArr, ++iter)
 					{
@@ -174,7 +174,7 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 								if (++pNewBucket == pBucketArr + nBucketCap)
 								{
 									pBucketDesc = (Variant*)pBucketDesc->pValue;
-									nBucketCap = (unsigned short)pBucketDesc->nCap;
+									nBucketCap = pBucketDesc->usCap;
 									pBucketArr = (Bucket*)(pBucketDesc + 1);
 									pNewBucket = pBucketArr;
 								}
@@ -187,7 +187,7 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 				}
 			}
 
-			pGlobDesc->nReplaced = 1;
+			pGlobDesc->usReplaced = 1;
 			pGlobDesc->pValue = to->pValue;
 		}
 		else
@@ -849,8 +849,31 @@ extern "C"
 		VirtualMachine::Initialize();
 		bool bSuccsess = VirtualMachine::Run(program);
 		string sStack = VirtualMachine::GetStack();
-		VirtualMachine::ShutDown();
+		//VirtualMachine::ShutDown();
 		std::cout << sStack << std::endl;
 		return bSuccsess;
+	}
+}
+
+#include <ctime>
+extern "C"
+{
+	__declspec(dllexport) void __stdcall MemoryPerformanceTest()
+	{
+		VirtualMachine::Initialize();
+		for (unsigned short i = 0; i < 1000; ++i)
+		{
+			for (unsigned short j = 0; j < 1000; ++j)
+			{
+				Variant* p = VirtualMachine::HeapAlloc(8);
+				Variant arr = Variant(p, 0, VarType::ARR);
+				for (unsigned short k = 0; k < 1000; ++k)
+				{
+					arr.PushBack(&Variant(0.0));
+					*(arr.Get(k)) = Variant(1.0);
+				}
+			}
+		}
+		VirtualMachine::ShutDown();
 	}
 }

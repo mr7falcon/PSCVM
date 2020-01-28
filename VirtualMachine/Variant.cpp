@@ -11,16 +11,16 @@ const string Variant::ToString() const
 	{
 		return std::to_string(dValue);
 	}
+	else if (!pValue)
+	{
+		return "NULL";
+	}
 	else if (usType == VarType::STR)
 	{
 		string str = "\'";
 		str.append((char*)pValue, usLength);
 		str += '\'';
 		return str;
-	}
-	else if (!pValue)
-	{
-		return "NULL";
 	}
 	else
 	{
@@ -29,7 +29,7 @@ const string Variant::ToString() const
 		Variant* pGlobalDesc = (Variant*)pValue;
 		Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
 		Variant* pArr = pLocalDesc + 1;
-		Variant* stop = pArr + (unsigned short)pLocalDesc->nCap;
+		Variant* stop = pArr + pLocalDesc->usCap;
 
 		if (usType == VarType::ARR)
 		{
@@ -43,7 +43,7 @@ const string Variant::ToString() const
 				{
 					pLocalDesc = (Variant*)pLocalDesc->pValue;
 					pArr = pLocalDesc + 1;
-					stop = pArr + (unsigned short)pLocalDesc->nCap;
+					stop = pArr + pLocalDesc->usCap;
 				}
 
 				str = str + " | " + pArr->ToString();
@@ -59,7 +59,7 @@ const string Variant::ToString() const
 			Bucket* bucket;
 			while (true)
 			{
-				const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+				const unsigned short capacity = pLocalDesc->usCap;
 
 				for (; pArr <= stop; ++pArr)
 				{
@@ -85,7 +85,7 @@ const string Variant::ToString() const
 
 				pLocalDesc = (Variant*)pLocalDesc->pValue;
 				pArr = pLocalDesc + 1;
-				stop = pArr + (unsigned short)pLocalDesc->nCap;
+				stop = pArr + pLocalDesc->usCap;
 			}
 		}
 	}
@@ -116,7 +116,7 @@ Variant Variant::FromBytes(byte** pc)
 
 			while (pLocalDesc->pValue)
 			{
-				const unsigned short capacity = (unsigned short)pLocalDesc->nCap;
+				const unsigned short capacity = pLocalDesc->usCap;
 
 				for (; pArr <= pLocalDesc + capacity; ++pArr)
 				{
@@ -143,7 +143,7 @@ Variant Variant::FromBytes(byte** pc)
 
 			while (pBucketDesc)
 			{
-				const unsigned short bucketCap = (unsigned short)pBucketDesc->nCap;
+				const unsigned short bucketCap = pBucketDesc->usCap;
 				Bucket* pBucketArr = (Bucket*)pBucketDesc + 1;
 				for (Bucket* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; ++pBucket)
 				{
@@ -177,12 +177,15 @@ Variant Variant::FromBytes(byte** pc)
 
 bool Variant::Equal(Variant* op1, Variant* op2)
 {
-	if (!op1->pValue && !op2->pValue)
+	if (op1->usNull == c_null && op2->usNull == c_null)
 	{
-		return op1->dValue == op2->dValue;
-	}
-	else
-	{
+		Variant* pValue1 = (Variant*)op1->pValue;
+		Variant* pValue2 = (Variant*)op2->pValue;
+		if (!pValue1 && !pValue2)
+		{
+			return true;
+		}
+
 		unsigned short type = op1->usType;
 		
 		if (type != op2->usType)
@@ -190,7 +193,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			return false;
 		}
 
-		if (!op1->pValue || !op2->pValue)
+		if (!pValue1 || !pValue2)
 		{
 			return false;
 		}
@@ -204,7 +207,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 		{
 			for (unsigned short i = 0; i < op1->usLength; ++i)
 			{
-				if (*((char*)op1->pValue + i) != *((char*)op2->pValue + i))
+				if (*((char*)pValue1 + i) != *((char*)pValue2 + i))
 				{
 					return false;
 				}
@@ -214,14 +217,14 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 		}
 		else
 		{
-			Variant* pGlobalDesc1 = (Variant*)op1->pValue;
-			Variant* pGlobalDesc2 = (Variant*)op2->pValue;
+			Variant* pGlobalDesc1 = pValue1;
+			Variant* pGlobalDesc2 = pValue2;
 			Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
 			Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
 			Variant* pArr1 = pLocalDesc1 + 1;
 			Variant* pArr2 = pLocalDesc2 + 1;
-			Variant* stop1 = pArr1 + (unsigned short)pLocalDesc1->nCap;
-			Variant* stop2 = pArr2 + (unsigned short)pLocalDesc2->nCap;
+			Variant* stop1 = pArr1 + pLocalDesc1->usCap;
+			Variant* stop2 = pArr2 + pLocalDesc2->usCap;
 
 			if (type == VarType::ARR)
 			{
@@ -231,14 +234,14 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 					{
 						pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
 						pArr1 = pLocalDesc1 + 1;
-						stop1 = pArr1 + (unsigned short)pLocalDesc1->nCap;
+						stop1 = pArr1 + pLocalDesc1->usCap;
 					}
 
 					if (pArr2 == stop2)
 					{
 						pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
 						pArr2 = pLocalDesc2 + 1;
-						stop2 = pArr2 + (unsigned short)pLocalDesc2->nCap;
+						stop2 = pArr2 + pLocalDesc2->usCap;
 					}
 
 					if (!Equal(pArr1, pArr2))
@@ -263,7 +266,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 						{
 							pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
 							pArr1 = pLocalDesc1 + 1;
-							stop1 = pArr1 + (unsigned short)pLocalDesc1->nCap;
+							stop1 = pArr1 + pLocalDesc1->usCap;
 						}
 
 						if (pArr1->pValue)
@@ -282,7 +285,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 						{
 							pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
 							pArr2 = pLocalDesc2 + 1;
-							stop2 = pArr2 + (unsigned short)pLocalDesc2->nCap;
+							stop2 = pArr2 + pLocalDesc2->usCap;
 						}
 
 						if (pArr2->lValue > 0)
@@ -308,12 +311,16 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			return true;
 		}
 	}
+	else
+	{
+		return op1->dValue == op2->dValue;
+	}
 }
 
 void Variant::PushBack(Variant* var)
 {
 	Variant* pGlobalDesc = (Variant*)pValue;
-	const unsigned short cap = (unsigned short)pGlobalDesc->nCap;
+	unsigned short cap = pGlobalDesc->usCap;
 	if (usLength == cap)
 	{
 		const unsigned short inc = cap >> c_capInc;
@@ -326,18 +333,18 @@ void Variant::PushBack(Variant* var)
 			p = (Variant*)p->pValue;
 		}
 		p->pValue = pLocalDesc;
-		pGlobalDesc->nCap += inc;
+		pGlobalDesc->usCap += inc;
 	}
 	else
 	{
 		Variant* p = (Variant*)pGlobalDesc->pValue;
-		unsigned short cap = (unsigned short)p->nCap;
+		cap = p->usCap;
 		unsigned short length = usLength;
 		while (length > cap)
 		{
 			length -= cap;
 			p = (Variant*)p->pValue;
-			cap = (unsigned short)p->nCap;
+			cap = p->usCap;
 		}
 
 		*(p + 1 + length) = *var;
@@ -348,7 +355,7 @@ void Variant::PushBack(Variant* var)
 
 void Variant::Insert(Variant* key, Variant* val)
 {
-	const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
+	const unsigned short capacity = ((Variant*)pValue)->usCap;
 	unsigned short index = key->GetHash() % capacity;
 
 	Variant* entry = (Variant*)Get(index);
@@ -375,7 +382,7 @@ void Variant::Insert(Variant* key, Variant* val)
 
 Variant* Variant::Find(Variant* key) const
 {
-	const unsigned short capacity = (unsigned short)((Variant*)pValue)->nCap;
+	const unsigned short capacity = ((Variant*)pValue)->usCap;
 	unsigned short index = key->GetHash() % capacity;
 
 	Bucket* bucket = (Bucket*)Get(index)->pValue;

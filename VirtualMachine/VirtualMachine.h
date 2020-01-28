@@ -66,7 +66,7 @@ public:
 
 		if (!local)
 		{
-			*pGlobalDesc = Variant((const unsigned int)count);
+			*pGlobalDesc = Variant(count);
 			--nChunkRemain;
 			++pLocalDesc;
 		}
@@ -81,7 +81,7 @@ public:
 
 		if (count < nChunkRemain)
 		{
-			*pLocalDesc = Variant((const unsigned int)count);
+			*pLocalDesc = Variant(count);
 			++nCountRemain;
 			
 			if (!local)
@@ -91,7 +91,7 @@ public:
 		}
 		else
 		{
-			*pLocalDesc = Variant((const unsigned int)nChunkRemain);
+			*pLocalDesc = Variant((unsigned short)nChunkRemain);
 			nCountRemain -= nChunkRemain;
 
 			if (local)
@@ -109,7 +109,7 @@ public:
 				m_pCurrentChunk = m_pCurrentChunk->pNext;
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
-				*pLocalDesc = Variant((const unsigned int)c_nChunkCapacity);
+				*pLocalDesc = Variant(c_nChunkCapacity);
 			}
 
 			m_pCurrentChunk->pNext = new HeapChunk;
@@ -119,7 +119,7 @@ public:
 			{
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
-				*pLocalDesc = Variant((const unsigned int)nCountRemain);
+				*pLocalDesc = Variant(nCountRemain);
 				++nCountRemain;
 			}
 			else
@@ -152,12 +152,12 @@ public:
 
 		if (count < nChunkRemain)
 		{
-			*pLocalDesc = Variant((unsigned int)count);
+			*pLocalDesc = Variant(count);
 			nCountRemain = nCountRemain * size + 1;
 		}
 		else
 		{
-			*pLocalDesc = Variant((const unsigned int)nChunkRemain);
+			*pLocalDesc = Variant((const unsigned short)nChunkRemain);
 			nCountRemain -= nChunkRemain;
 
 			for (; nCountRemain >= c_nChunkSizeStruct; nCountRemain -= c_nChunkSizeStruct)
@@ -166,7 +166,7 @@ public:
 				m_pCurrentChunk = m_pCurrentChunk->pNext;
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
-				*pLocalDesc = Variant((const unsigned int)c_nChunkSizeStruct);
+				*pLocalDesc = Variant(c_nChunkSizeStruct);
 			}
 
 			m_pCurrentChunk->pNext = new HeapChunk;
@@ -176,7 +176,7 @@ public:
 			{
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
-				*pLocalDesc = Variant((const unsigned int)nCountRemain);
+				*pLocalDesc = Variant(nCountRemain);
 				nCountRemain = nCountRemain * size + 1;
 			}
 			else

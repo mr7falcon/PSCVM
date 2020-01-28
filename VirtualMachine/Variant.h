@@ -47,9 +47,9 @@ struct Variant
 		  pValue(var)
 	{}
 
-	inline Variant(const unsigned int cap, Variant* next = nullptr)
-		: nCap(cap),
-		  nReplaced(0),
+	inline Variant(const unsigned short cap, Variant* next = nullptr)
+		: usCap(cap),
+		  usReplaced(0),
 		  pValue(next)
 	{}
 
@@ -81,9 +81,9 @@ struct Variant
 	{
 		Variant* p = (Variant*)((Variant*)pValue)->pValue;
 		unsigned short index = i;
-		while (index >= (unsigned short)p->nCap)
+		while (index >= p->usCap)
 		{
-			index -= (unsigned short)p->nCap;
+			index -= p->usCap;
 			p = (Variant*)p->pValue;
 		}
 		return p + 1 + index;
@@ -139,8 +139,9 @@ struct Variant
 
 		struct
 		{
-			unsigned int nCap;
-			unsigned int nReplaced;
+			unsigned short usCap;
+			unsigned short usReplaced;
+			unsigned int null;
 		};
 	};
 
