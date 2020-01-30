@@ -127,6 +127,13 @@ struct Variant
 		return hash;
 	}
 
+	inline void PopBack() noexcept
+	{
+		--usLength;
+	}
+
+	void Erase(Variant* key); //same with Bucket
+
 	inline void Concat(Variant* op)
 	{
 		if (usNull == c_null && op->usNull == c_null)

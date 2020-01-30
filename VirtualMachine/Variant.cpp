@@ -145,7 +145,7 @@ Variant Variant::FromBytes(byte** pc)
 			while (pBucketDesc)
 			{
 				const unsigned short bucketCap = pBucketDesc->usCap;
-				Bucket* pBucketArr = (Bucket*)pBucketDesc + 1;
+				Bucket* pBucketArr = (Bucket*)(pBucketDesc + 1);
 				for (Bucket* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; ++pBucket)
 				{
 					Variant key = Variant::FromBytes(pc);
@@ -396,6 +396,32 @@ Variant* Variant::Find(Variant* key) const
 		}
 
 		bucket = (Bucket*)bucket->next.pValue;
+	}
+
+	//key is missing - throw any exception
+	throw new std::exception("idi rabotay, suka!");
+}
+
+void Variant::Erase(Variant* key)
+{
+	const unsigned short cap = ((Variant*)pValue)->usCap;
+	unsigned short index = key->GetHash() % cap;
+	Variant* pEntry = Get(index);
+	Variant* prev = pEntry;
+	Bucket* pBucket = (Bucket*)pEntry->pValue;
+
+	while (pBucket)
+	{
+		if (Equal(key, &pBucket->key))
+		{
+			--usLength;
+			--pEntry->usCap;
+			pBucket = (Bucket*)pBucket->next.pValue;
+			prev->pValue = pBucket;
+			return;
+		}
+		prev = &pBucket->next;
+		pBucket = (Bucket*)pBucket->next.pValue;
 	}
 
 	//key is missing - throw any exception

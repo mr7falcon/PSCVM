@@ -49,6 +49,8 @@ enum ByteCommand : byte
 	DINSERT,
 	NONE,
 	CONCAT,
+	APOP,
+	DERASE,
 };
 
 class VirtualMachine

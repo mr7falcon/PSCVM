@@ -49,6 +49,8 @@ namespace Compiler
             DINSERT,
             NONE,
             CONCAT,
+            APOP,
+            DERASE,
         };
 
         public enum VarType : ushort
@@ -334,6 +336,14 @@ namespace Compiler
                         break;
                     case "CONCAT":
                         byteCode.Add((byte)ByteCommand.CONCAT);
+                        break;
+                    case "APOP":
+                        byteCode.Add((byte)ByteCommand.APOP);
+                        byteCode.AddRange(AddInt());
+                        break;
+                    case "DERASE":
+                        byteCode.Add((byte)ByteCommand.DERASE);
+                        byteCode.AddRange(AddInt());
                         break;
                     default:
                         throw new Exception("unknown command");

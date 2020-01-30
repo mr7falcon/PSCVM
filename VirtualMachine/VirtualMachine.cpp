@@ -502,6 +502,31 @@ bool VirtualMachine::Run(byte* program)
 			op2->Free();
 		}
 		break;
+		case ByteCommand::APOP:
+		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
+#ifdef _DEBUG
+			Log("APOP " + std::to_string(offset));
+#endif
+
+			(m_pStack + m_nCapacity - offset)->PopBack();
+		}
+		break;
+		case ByteCommand::DERASE:
+		{
+			const int offset = *((int*)pc);
+			pc += sizeof(int);
+
+#ifdef _DEBUG
+			Log("DERASE " + std::to_string(offset) + " " + m_sp->ToString());
+#endif
+
+			(m_pStack + m_nCapacity - offset)->Erase(m_sp);
+			(m_sp++)->Free();
+		}
+		break;
 		case ByteCommand::PUSH:
 		{
 			if (m_sp - 1 == m_bp)
