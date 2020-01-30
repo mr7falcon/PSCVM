@@ -489,6 +489,19 @@ bool VirtualMachine::Run(byte* program)
 			*m_sp = Variant(dict, 0, VarType::DICT);
 		}
 		break;
+		case ByteCommand::CONCAT:
+		{
+			Variant* op2 = m_sp;
+			Variant* op1 = ++m_sp;
+			
+#ifdef _DEBUG
+			Log("CONCAT " + op1->ToString() + " " + op2->ToString());
+#endif
+
+			op1->Concat(op2);
+			op2->Free();
+		}
+		break;
 		case ByteCommand::PUSH:
 		{
 			if (m_sp - 1 == m_bp)
@@ -849,31 +862,8 @@ extern "C"
 		VirtualMachine::Initialize();
 		bool bSuccsess = VirtualMachine::Run(program);
 		string sStack = VirtualMachine::GetStack();
-		//VirtualMachine::ShutDown();
+		VirtualMachine::ShutDown();
 		std::cout << sStack << std::endl;
 		return bSuccsess;
-	}
-}
-
-#include <ctime>
-extern "C"
-{
-	__declspec(dllexport) void __stdcall MemoryPerformanceTest()
-	{
-		VirtualMachine::Initialize();
-		for (unsigned short i = 0; i < 1000; ++i)
-		{
-			for (unsigned short j = 0; j < 1000; ++j)
-			{
-				Variant* p = VirtualMachine::HeapAlloc(8);
-				Variant arr = Variant(p, 0, VarType::ARR);
-				for (unsigned short k = 0; k < 1000; ++k)
-				{
-					arr.PushBack(&Variant(0.0));
-					*(arr.Get(k)) = Variant(1.0);
-				}
-			}
-		}
-		VirtualMachine::ShutDown();
 	}
 }

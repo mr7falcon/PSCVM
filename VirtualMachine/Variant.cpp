@@ -117,18 +117,19 @@ Variant Variant::FromBytes(byte** pc)
 			while (pLocalDesc->pValue)
 			{
 				const unsigned short capacity = pLocalDesc->usCap;
-
-				for (; pArr <= pLocalDesc + capacity; ++pArr)
+				const Variant* pStop = pLocalDesc + capacity;
+				for (Variant* p = pLocalDesc + 1; p <= pStop; ++p)
 				{
-					*pArr = Variant::FromBytes(pc);
+					*p = Variant::FromBytes(pc);
 				}
-
+				pLocalDesc = (Variant*)pLocalDesc->pValue;
 				length -= capacity;
 			}
 
-			for (; pArr <= pLocalDesc + length; ++pArr)
+			const Variant* pStop = pLocalDesc + length;
+			for (Variant* p = pLocalDesc + 1; p <= pStop; ++p)
 			{
-				*pArr = Variant::FromBytes(pc);
+				*p = Variant::FromBytes(pc);
 			}
 
 			var.pValue = pArr;

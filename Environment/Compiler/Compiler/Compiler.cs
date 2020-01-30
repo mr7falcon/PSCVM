@@ -47,8 +47,8 @@ namespace Compiler
             DSTORE,
             DFETCH,
             DINSERT,
-
-            NONE
+            NONE,
+            CONCAT,
         };
 
         public enum VarType : ushort
@@ -331,6 +331,9 @@ namespace Compiler
                     case "DSTORE":
                         byteCode.Add((byte)ByteCommand.DSTORE);
                         byteCode.AddRange(AddInt());
+                        break;
+                    case "CONCAT":
+                        byteCode.Add((byte)ByteCommand.CONCAT);
                         break;
                     default:
                         throw new Exception("unknown command");

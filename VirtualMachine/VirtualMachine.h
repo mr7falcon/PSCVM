@@ -6,7 +6,7 @@
 #include <fstream>
 #endif
 
-
+//DO NOT CHANGE ORDER!
 enum ByteCommand : byte
 {
 	CALL,
@@ -47,8 +47,8 @@ enum ByteCommand : byte
 	DSTORE,
 	DFETCH,
 	DINSERT,
-
-	NONE
+	NONE,
+	CONCAT,
 };
 
 class VirtualMachine
