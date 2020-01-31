@@ -841,6 +841,16 @@ bool VirtualMachine::Run(byte* program)
 #endif
 		}
 		break;
+		case ByteCommand::PRINT:
+		{
+#ifdef _DEBUG
+			Log("PRINT");
+#endif
+
+			std::cout << m_sp->ToString() << std::endl;
+			(m_sp++)->Free();
+		}
+		break;
 		case ByteCommand::NONE:
 		{
 #ifdef _DEBUG

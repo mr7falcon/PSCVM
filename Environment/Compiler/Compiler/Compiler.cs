@@ -51,6 +51,7 @@ namespace Compiler
             CONCAT,
             APOP,
             DERASE,
+            PRINT,
         };
 
         public enum VarType : ushort
@@ -66,6 +67,13 @@ namespace Compiler
 
         private static string program;
         private static int i = 0;
+        
+        private struct Coords
+        {
+            public int oper;
+            public int pos;
+        }
+        private static Dictionary<string, Coords> marks = new Dictionary<string, Coords>();
         
         private static void ClearSpaces()
         {
@@ -99,8 +107,10 @@ namespace Compiler
             }
         }
 
-        private static byte[] AddVar()
+        private static void AddVar(List<byte[]> cont = null)
         {
+            byte[] bts;
+
             ClearSpaces();
 
             if (program[i] == '\'' || program[i] == '\"')
@@ -117,7 +127,7 @@ namespace Compiler
                 bytes.AddRange(BitConverter.GetBytes(usLength));
                 bytes.AddRange(BitConverter.GetBytes((ushort)1));
                 bytes.AddRange(Encoding.ASCII.GetBytes(op));
-                return bytes.ToArray();
+                bts = bytes.ToArray();
             }
             else if (program[i] == '{')
             {
@@ -126,7 +136,7 @@ namespace Compiler
                 List<byte[]> varBytes = new List<byte[]>();
                 while (true)
                 {
-                    varBytes.Add(AddVar());
+                    AddVar(varBytes);
 
                     ClearSpaces();
                     char sym = program[i++];
@@ -158,7 +168,7 @@ namespace Compiler
                     bytes.AddRange(varBytes[j]);
                 }
 
-                return bytes.ToArray();
+                bts = bytes.ToArray();
             }
             else
             {
@@ -167,24 +177,62 @@ namespace Compiler
                 {
                     op += program[i++];
                 }
-                return BitConverter.GetBytes(double.Parse(op));
+                bts = BitConverter.GetBytes(double.Parse(op));
+            }
+
+            if (cont != null)
+            {
+                cont.Add(bts);
+            }
+            else
+            {
+                byteCode.AddRange(bts);
             }
         }
 
-        private static byte[] AddInt()
+        private static void AddInt()
         {
             ClearSpaces();
             string op = Split();
             int offset = int.Parse(op);
-            return BitConverter.GetBytes(offset);
+            byteCode.AddRange(BitConverter.GetBytes(offset));
         }
 
-        private static byte[] AddLong()
+        private static void AddByte(byte b)
+        {
+            byteCode.Add(b);
+        }
+
+        private static void AddMark()
         {
             ClearSpaces();
-            string op = Split();
-            long offset = long.Parse(op);
-            return BitConverter.GetBytes(offset);
+            string mark = Split();
+            Coords coords;
+            if (marks.ContainsKey(mark))
+            {
+                coords = marks[mark];
+                coords.pos = byteCode.Count;
+            }
+            else
+            {
+                coords = new Coords
+                {
+                    pos = byteCode.Count
+                };
+            }
+            marks[mark] = coords;
+            byteCode.AddRange(BitConverter.GetBytes((long)0));
+        }
+
+        private static byte[] Linking()
+        {
+            byte[] bytes = byteCode.ToArray();
+            foreach(KeyValuePair<string, Coords> mark in marks)
+            {
+                byte[] markBytes = BitConverter.GetBytes((long)mark.Value.oper);
+                Array.Copy(markBytes, 0, bytes, mark.Value.pos, 8);
+            }
+            return bytes;
         }
 
         static void Main(string[] args)
@@ -203,157 +251,182 @@ namespace Compiler
                 switch (command)
                 {
                     case "CALL":
-                        byteCode.Add((byte)ByteCommand.CALL);
-                        byteCode.AddRange(AddLong());
+                        AddByte((byte)ByteCommand.CALL);
+                        AddMark();
                         break;
                     case "RET":
-                        byteCode.Add((byte)ByteCommand.RET);
+                        AddByte((byte)ByteCommand.RET);
                         break;
                     case "FETCH":
-                        byteCode.Add((byte)ByteCommand.FETCH);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.FETCH);
+                        AddInt();
                         break;
                     case "STORE":
-                        byteCode.Add((byte)ByteCommand.STORE);
+                        AddByte((byte)ByteCommand.STORE);
                         AddInt();
                         break;
                     case "LFETCH":
-                        byteCode.Add((byte)ByteCommand.LFETCH);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.LFETCH);
+                        AddInt();
                         break;
                     case "LSTORE":
-                        byteCode.Add((byte)ByteCommand.LSTORE);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.LSTORE);
+                        AddInt();
                         break;
                     case "LALLOC":
-                        byteCode.Add((byte)ByteCommand.LALLOC);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.LALLOC);
+                        AddInt();
                         break;
                     case "LFREE":
-                        byteCode.Add((byte)ByteCommand.LFREE);
+                        AddByte((byte)ByteCommand.LFREE);
                         break;
                     case "PUSH":
-                        byteCode.Add((byte)ByteCommand.PUSH);
-                        byteCode.AddRange(AddVar());
+                        AddByte((byte)ByteCommand.PUSH);
+                        AddVar();
                         break;
                     case "POP":
-                        byteCode.Add((byte)ByteCommand.POP);
+                        AddByte((byte)ByteCommand.POP);
                         break;
                     case "ADD":
-                        byteCode.Add((byte)ByteCommand.ADD);
+                        AddByte((byte)ByteCommand.ADD);
                         break;
                     case "SUB":
-                        byteCode.Add((byte)ByteCommand.SUB);
+                        AddByte((byte)ByteCommand.SUB);
                         break;
                     case "MULT":
-                        byteCode.Add((byte)ByteCommand.MULT);
+                        AddByte((byte)ByteCommand.MULT);
                         break;
                     case "DIV":
-                        byteCode.Add((byte)ByteCommand.DIV);
+                        AddByte((byte)ByteCommand.DIV);
                         break;
                     case "INC":
-                        byteCode.Add((byte)ByteCommand.INC);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.INC);
+                        AddInt();
                         break;
                     case "DEC":
-                        byteCode.Add((byte)ByteCommand.DEC);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.DEC);
+                        AddInt();
                         break;
                     case "MOD":
-                        byteCode.Add((byte)ByteCommand.MOD);
+                        AddByte((byte)ByteCommand.MOD);
                         break;
                     case "AND":
-                        byteCode.Add((byte)ByteCommand.AND);
+                        AddByte((byte)ByteCommand.AND);
                         break;
                     case "OR":
-                        byteCode.Add((byte)ByteCommand.OR);
+                        AddByte((byte)ByteCommand.OR);
                         break;
                     case "NOT":
-                        byteCode.Add((byte)ByteCommand.NOT);
+                        AddByte((byte)ByteCommand.NOT);
                         break;
                     case "LT":
-                        byteCode.Add((byte)ByteCommand.LT);
+                        AddByte((byte)ByteCommand.LT);
                         break;
                     case "GT":
-                        byteCode.Add((byte)ByteCommand.GT);
+                        AddByte((byte)ByteCommand.GT);
                         break;
                     case "LET":
-                        byteCode.Add((byte)ByteCommand.LET);
+                        AddByte((byte)ByteCommand.LET);
                         break;
                     case "GET":
-                        byteCode.Add((byte)ByteCommand.GET);
+                        AddByte((byte)ByteCommand.GET);
                         break;
                     case "EQ":
-                        byteCode.Add((byte)ByteCommand.EQ);
+                        AddByte((byte)ByteCommand.EQ);
                         break;
                     case "NEQ":
-                        byteCode.Add((byte)ByteCommand.NEQ);
+                        AddByte((byte)ByteCommand.NEQ);
                         break;
                     case "JZ":
-                        byteCode.Add((byte)ByteCommand.JZ);
-                        byteCode.AddRange(AddLong());
+                        AddByte((byte)ByteCommand.JZ);
+                        AddMark();
                         break;
                     case "JNZ":
-                        byteCode.Add((byte)ByteCommand.JNZ);
-                        byteCode.AddRange(AddLong());
+                        AddByte((byte)ByteCommand.JNZ);
+                        AddMark();
                         break;
                     case "JMP":
-                        byteCode.Add((byte)ByteCommand.JMP);
-                        byteCode.AddRange(AddLong());
+                        AddByte((byte)ByteCommand.JMP);
+                        AddMark();
                         break;
                     case "HALT":
-                        byteCode.Add((byte)ByteCommand.HALT);
+                        AddByte((byte)ByteCommand.HALT);
                         break;
                     case "ARR":
-                        byteCode.Add((byte)ByteCommand.ARRAY);
+                        AddByte((byte)ByteCommand.ARRAY);
                         break;
                     case "DICT":
-                        byteCode.Add((byte)ByteCommand.DICTIONARY);
+                        AddByte((byte)ByteCommand.DICTIONARY);
                         break;
                     case "DINS":
-                        byteCode.Add((byte)ByteCommand.DINSERT);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.DINSERT);
+                        AddInt();
                         break;
                     case "AFETCH":
-                        byteCode.Add((byte)ByteCommand.AFETCH);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.AFETCH);
+                        AddInt();
                         break;
                     case "ASTORE":
-                        byteCode.Add((byte)ByteCommand.ASTORE);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.ASTORE);
+                        AddInt();
                         break;
                     case "APUSH":
-                        byteCode.Add((byte)ByteCommand.APUSH);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.APUSH);
+                        AddInt();
                         break;
                     case "DFETCH":
-                        byteCode.Add((byte)ByteCommand.DFETCH);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.DFETCH);
+                        AddInt();
                         break;
                     case "DSTORE":
-                        byteCode.Add((byte)ByteCommand.DSTORE);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.DSTORE);
+                        AddInt();
                         break;
                     case "CONCAT":
-                        byteCode.Add((byte)ByteCommand.CONCAT);
+                        AddByte((byte)ByteCommand.CONCAT);
                         break;
                     case "APOP":
-                        byteCode.Add((byte)ByteCommand.APOP);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.APOP);
+                        AddInt();
                         break;
                     case "DERASE":
-                        byteCode.Add((byte)ByteCommand.DERASE);
-                        byteCode.AddRange(AddInt());
+                        AddByte((byte)ByteCommand.DERASE);
+                        AddInt();
+                        break;
+                    case "PRINT":
+                        AddByte((byte)ByteCommand.PRINT);
                         break;
                     default:
-                        throw new Exception("unknown command");
+                        if (command[command.Length - 1] == ':')
+                        {
+                            string mark = command.Substring(0, command.Length - 1);
+                            Coords coords;
+                            if (marks.ContainsKey(mark))
+                            {
+                                coords = marks[mark];
+                                coords.oper = byteCode.Count;
+                            }
+                            else
+                            {
+                                coords = new Coords
+                                {
+                                    oper = byteCode.Count
+                                };
+                            }
+                            marks[mark] = coords;
+                        }
+                        else
+                        {
+                            throw new Exception("unknown command" + command);
+                        }
+                        break;
                 }
             }
 
             using (FileStream fstream = new FileStream("../../../../Tests/Byte/" +
                    Path.GetFileNameWithoutExtension(args[0]) + ".bpsc", FileMode.Create))
             {
-                fstream.Write(byteCode.ToArray(), 0, byteCode.Count);
+                fstream.Write(Linking(), 0, byteCode.Count);
             }
         }
     }

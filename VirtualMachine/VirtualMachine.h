@@ -51,6 +51,7 @@ enum ByteCommand : byte
 	CONCAT,
 	APOP,
 	DERASE,
+	PRINT,
 };
 
 class VirtualMachine
