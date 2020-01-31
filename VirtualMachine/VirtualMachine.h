@@ -220,10 +220,9 @@ public:
 		return p;
 	}
 
-	static inline bool Run(byte* program);
+	static inline void Run(byte* program);
 
-	static inline const string GetStack();
-	static inline const Variant* GetStack(int* size);
+	static inline Variant Return() { return *m_sp; }
 
 private:
 	VirtualMachine();

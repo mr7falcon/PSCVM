@@ -233,7 +233,7 @@ VirtualMachine::HeapChunk::~HeapChunk()
 	}
 }
 
-bool VirtualMachine::Run(byte* program)
+void VirtualMachine::Run(byte* program)
 {
 	byte* pc = program;
 
@@ -864,41 +864,41 @@ bool VirtualMachine::Run(byte* program)
 			Log("HALT");
 #endif
 
-			return true;
+			return;
 		}
 		default:
 		{
-			return false;
+			return;
 		}
 		}
 	}
-}
-
-const Variant* VirtualMachine::GetStack(int* size)
-{
-	*size = m_nCapacity;
-	return m_pStack;
-}
-
-const string VirtualMachine::GetStack()
-{
-	string sStack = "";
-	for (Variant* p = m_sp; p < m_pStack + m_nCapacity; ++p)
-	{
-		sStack = sStack + p->ToString() + '\n';
-	}
-	return sStack;
 }
 
 extern "C"
 {
-	__declspec(dllexport) bool __stdcall VMRun(byte* program)
+	__declspec(dllexport) void __stdcall Run(byte* program)
 	{
 		VirtualMachine::Initialize();
-		bool bSuccsess = VirtualMachine::Run(program);
-		string sStack = VirtualMachine::GetStack();
+		VirtualMachine::Run(program);
 		VirtualMachine::ShutDown();
-		std::cout << sStack << std::endl;
-		return bSuccsess;
+	}
+
+	__declspec(dllexport) double __stdcall NumRun(byte* program)
+	{
+		VirtualMachine::Initialize();
+		VirtualMachine::Run(program);
+		double num = VirtualMachine::Return().dValue;
+		VirtualMachine::ShutDown();
+		return num;
+	}
+
+	__declspec(dllexport) void __stdcall StrRun(byte* program, char* res)
+	{
+		VirtualMachine::Initialize();
+		VirtualMachine::Run(program);
+		Variant var = VirtualMachine::Return();
+		memcpy(res, var.pValue, var.usLength);
+		*(res + var.usLength) = '\0';
+		VirtualMachine::ShutDown();
 	}
 }

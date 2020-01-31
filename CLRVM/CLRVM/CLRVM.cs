@@ -5,12 +5,30 @@ namespace CLRVM
 {
     public class CLRVM
     {
-        [DllImport("VirtualMachine_x64.dll", EntryPoint = "VMRun", CallingConvention = CallingConvention.StdCall)]
-        public static extern bool VMRun(byte[] program);
+        [DllImport("VirtualMachine_x64.dll", EntryPoint = "Run", CallingConvention = CallingConvention.StdCall)]
+        public static extern void Run(byte[] program);
+        
+        [DllImport("VirtualMachine_x64.dll", EntryPoint = "NumRun", CallingConvention = CallingConvention.StdCall)]
+        public static extern double NumRun(byte[] program);
+        
+        [DllImport("VirtualMachine_x64.dll", EntryPoint = "StrRun", CallingConvention = CallingConvention.StdCall)]
+        public static extern void StrRun(byte[] program, char[] res);
 
-        public static void VMRunUDF(SqlBinary byteCode)
+        public static void RunUDF(SqlBinary byteCode)
         {
-            VMRun(byteCode.Value);
+            Run(byteCode.Value);
+        }
+
+        public static SqlDouble NumRunUDF(SqlBinary byteCode)
+        {
+            return NumRun(byteCode.Value);
+        }
+
+        public static SqlString StrRunUDF(SqlBinary byteCode)
+        {
+            char[] res = new char[100];
+            StrRun(byteCode.Value, res);
+            return new string(res);
         }
     }
 }
