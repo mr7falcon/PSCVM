@@ -4,6 +4,7 @@
 
 #ifdef _DEBUG
 #include <fstream>
+#include <ctime>
 #endif
 
 //DO NOT CHANGE ORDER!
@@ -72,6 +73,10 @@ public:
 			*pGlobalDesc = Variant(count);
 			--nChunkRemain;
 			++pLocalDesc;
+
+#ifdef _DEBUG
+			++g_memVar;
+#endif
 		}
 
 		if (nChunkRemain <= 0)
@@ -79,6 +84,11 @@ public:
 			m_pCurrentChunk->pNext = new HeapChunk;
 			m_pCurrentChunk = m_pCurrentChunk->pNext;
 			pLocalDesc = m_pCurrentChunk->vData;
+
+#ifdef _DEBUG
+			g_memVar += (nChunkRemain + 1);
+#endif
+
 			nChunkRemain = c_nChunkCapacity;
 		}
 
@@ -113,6 +123,10 @@ public:
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
 				*pLocalDesc = Variant(c_nChunkCapacity);
+
+#ifdef _DEBUG
+				++g_memVar;
+#endif
 			}
 
 			m_pCurrentChunk->pNext = new HeapChunk;
@@ -124,6 +138,10 @@ public:
 				pLocalDesc = m_pCurrentChunk->vData;
 				*pLocalDesc = Variant(nCountRemain);
 				++nCountRemain;
+
+#ifdef _DEBUG
+				++g_memVar;
+#endif
 			}
 			else
 			{
@@ -132,6 +150,11 @@ public:
 		}
 
 		m_pCurrentSlot = pLocalDesc + nCountRemain;
+
+#ifdef _DEBUG
+		g_memVar += (count + 1);
+		LogMemory();
+#endif
 
 		return pGlobalDesc;
 	}
@@ -149,6 +172,11 @@ public:
 			m_pCurrentChunk->pNext = new HeapChunk;
 			m_pCurrentChunk = m_pCurrentChunk->pNext;
 			pLocalDesc = m_pCurrentChunk->vData;
+
+#ifdef _DEBUG
+			g_memVar += ((nChunkRemain + 1) * size);
+#endif
+
 			nChunkRemain = c_nChunkSizeStruct;
 			pGlobalDesc = pLocalDesc;
 		}
@@ -170,6 +198,10 @@ public:
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
 				*pLocalDesc = Variant(c_nChunkSizeStruct);
+
+#ifdef _DEBUG
+				++g_memVar;
+#endif
 			}
 
 			m_pCurrentChunk->pNext = new HeapChunk;
@@ -181,6 +213,10 @@ public:
 				pLocalDesc = m_pCurrentChunk->vData;
 				*pLocalDesc = Variant(nCountRemain);
 				nCountRemain = nCountRemain * size + 1;
+
+#ifdef _DEBUG
+				++g_memVar;
+#endif
 			}
 			else
 			{
@@ -189,6 +225,11 @@ public:
 		}
 
 		m_pCurrentSlot = pLocalDesc + nCountRemain;
+
+#ifdef _DEBUG
+		g_memVar += (count * size + 1);
+		LogMemory();
+#endif
 
 		return pGlobalDesc;
 	}
@@ -205,6 +246,10 @@ public:
 			m_pCurrentChunk = m_pCurrentChunk->pNext;
 			p = m_pCurrentChunk->vData;
 			m_pCurrentSlot = p + size;
+
+#ifdef _DEBUG
+			g_memVar += nChunkRemain;
+#endif
 		}
 		else if (nChunkRemain == size)
 		{
@@ -216,6 +261,11 @@ public:
 		{
 			m_pCurrentSlot += size;
 		}
+
+#ifdef _DEBUG
+		g_memVar += 3;
+		LogMemory();
+#endif
 
 		return p;
 	}
@@ -248,7 +298,14 @@ private:
 		Variant vData[c_nChunkSize];
 		HeapChunk* pNext = nullptr;
 
-		~HeapChunk();
+#ifdef _DEBUG
+		inline HeapChunk()
+		{
+			++g_memChunk;
+		}
+#endif
+
+		inline ~HeapChunk();
 	};
 	static HeapChunk* m_pFirstChunk;
 	static HeapChunk* m_pCurrentChunk;
@@ -260,5 +317,16 @@ private:
 	{
 		log << messege << std::endl;
 	}
+	static void LogMemory()
+	{
+		log << "Memory: chunk " << g_memChunk << " var " << g_memVar << std::endl;
+	}
+	static void LogTime(const clock_t time)
+	{
+		log << "Time: " << time << std::endl;
+	}
+
+	static long g_memVar;
+	static int g_memChunk;
 #endif
 };

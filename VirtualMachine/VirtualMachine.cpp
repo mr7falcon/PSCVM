@@ -11,6 +11,8 @@ Variant* VirtualMachine::m_bp;
 int VirtualMachine::m_nCapacity;
 #ifdef _DEBUG
 std::ofstream VirtualMachine::log;
+long VirtualMachine::g_memVar;
+int VirtualMachine::g_memChunk;
 #endif
 
 void VirtualMachine::Initialize()
@@ -26,6 +28,9 @@ void VirtualMachine::Initialize()
 #ifdef _DEBUG
 	log.open("log.log");
 	//throw any exception if file did not opened
+
+	g_memVar = 0;
+	g_memChunk = 1;
 #endif
 }
 
@@ -47,6 +52,10 @@ void VirtualMachine::ShutDown()
 		delete(iter);
 		iter = next;
 	}
+
+#ifdef _DEBUG
+	LogMemory();
+#endif
 }
 
 inline void VirtualMachine::Resize()
@@ -231,6 +240,19 @@ VirtualMachine::HeapChunk::~HeapChunk()
 	{
 		iter->Free();
 	}
+
+#ifdef _DEBUG
+	const unsigned short diff = (unsigned short)(m_pCurrentSlot - vData);
+	if (diff < c_nChunkCapacity)
+	{
+		g_memVar -= diff;
+	}
+	else
+	{
+		g_memVar -= c_nChunkCapacity;
+	}
+	--g_memChunk;
+#endif
 }
 
 void VirtualMachine::Run(byte* program)
@@ -336,6 +358,8 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("AFETCH " + std::to_string(offset) + " " + std::to_string(index));
+
+			const clock_t tStart = clock();
 #endif
 
 			Variant* arr = m_pStack + m_nCapacity - offset;
@@ -346,6 +370,11 @@ void VirtualMachine::Run(byte* program)
 			Variant* var = arr->Get(index);
 			var->Copy();
 			*m_sp = *var;
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::ASTORE:
@@ -358,6 +387,8 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("ASTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
+
+			const clock_t tStart = clock();
 #endif
 
 			Variant* arr = m_pStack + m_nCapacity - offset;
@@ -366,6 +397,11 @@ void VirtualMachine::Run(byte* program)
 				//throw any exception
 			}
 			*(arr->Get(index)) = *(m_sp++);
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::APUSH:
@@ -375,9 +411,16 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("APUSH " + m_sp->ToString() + " " + std::to_string(offset));
+
+			const clock_t tStart = clock();
 #endif
 
 			(m_pStack + m_nCapacity - offset)->PushBack(m_sp++);
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::DFETCH:
@@ -387,12 +430,19 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("DFETCH " + std::to_string(offset) + " " + m_sp->ToString());
+
+			const clock_t tStart = clock();
 #endif
 
 			Variant* val = (m_pStack + m_nCapacity - offset)->Find(m_sp);
 			val->Copy();
 			m_sp->Free();
 			*m_sp = *val;
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::DSTORE:
@@ -404,10 +454,17 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("DSTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+
+			const clock_t tStart = clock();
 #endif
 
 			*((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
 			key->Free();
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::DINSERT:
@@ -419,9 +476,16 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("DINS " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+
+			const clock_t tStart = clock();
 #endif
 
 			(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++);
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::LALLOC:
@@ -462,6 +526,8 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("ARR " + std::to_string(len));
+
+			const clock_t tStart = clock();
 #endif
 
 			unsigned short capacity = len + (len >> Variant::c_capInc);
@@ -472,6 +538,11 @@ void VirtualMachine::Run(byte* program)
 			}
 			Variant* arr = VirtualMachine::HeapAlloc(capacity);
 			*m_sp = Variant(arr, len, VarType::ARR);
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::DICTIONARY:
@@ -482,11 +553,18 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("DICT " + std::to_string(len));
+
+			const clock_t tStart = clock();
 #endif
 
 			const unsigned short capacity = GetPrime(len + (len >> Variant::c_capInc));
 			Variant* dict = VirtualMachine::HeapAlloc(capacity);
 			*m_sp = Variant(dict, 0, VarType::DICT);
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::CONCAT:
@@ -496,10 +574,17 @@ void VirtualMachine::Run(byte* program)
 			
 #ifdef _DEBUG
 			Log("CONCAT " + op1->ToString() + " " + op2->ToString());
+
+			const clock_t tStart = clock();
 #endif
 
 			op1->Concat(op2);
 			op2->Free();
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::APOP:
@@ -509,9 +594,16 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("APOP " + std::to_string(offset));
+
+			const clock_t tStart = clock();
 #endif
 
 			(m_pStack + m_nCapacity - offset)->PopBack();
+		
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::DERASE:
@@ -521,10 +613,17 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("DERASE " + std::to_string(offset) + " " + m_sp->ToString());
+
+			const clock_t tStart = clock();
 #endif
 
 			(m_pStack + m_nCapacity - offset)->Erase(m_sp);
 			(m_sp++)->Free();
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::PUSH:
@@ -766,12 +865,19 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("EQ " + op1->ToString() + " " + op2->ToString());
+
+			const clock_t tStart = clock();
 #endif
 
 			const double bRes = Variant::Equal(op1, op2) ? 1.0 : 0.0;
 			op1->Free();
 			op2->Free();
 			op1->dValue = bRes;
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::NEQ:
@@ -781,12 +887,19 @@ void VirtualMachine::Run(byte* program)
 
 #ifdef _DEBUG
 			Log("NEQ " + op1->ToString() + " " + op2->ToString());
+
+			const clock_t tStart = clock();
 #endif
 
 			const double bRes = Variant::Equal(op1, op2) ? 0.0 : 1.0;
 			op1->Free();
 			op2->Free();
 			op1->dValue = bRes;
+
+#ifdef _DEBUG
+			const clock_t tEnd = clock();
+			LogTime(tEnd - tStart);
+#endif
 		}
 		break;
 		case ByteCommand::JZ:

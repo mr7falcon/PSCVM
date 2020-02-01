@@ -6,7 +6,6 @@ using std::string;
 
 typedef unsigned char byte;
 
-class VirtualMachine;
 struct Bucket;
 
 enum VarType : unsigned short
