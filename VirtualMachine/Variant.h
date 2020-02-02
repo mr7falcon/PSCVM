@@ -3,6 +3,7 @@
 #include <string>
 
 using std::string;
+using std::exception;
 
 typedef unsigned char byte;
 
@@ -17,6 +18,11 @@ enum VarType : unsigned short
 
 struct Variant
 {
+	static const exception ex_keyMissing;
+	static const exception ex_typeMismatch;
+	static const exception ex_wrongType;
+	static const exception ex_outOfBounds;
+
 	static const unsigned short c_null = 0x7FF0;
 	static const char c_capInc = 2;
 
@@ -139,7 +145,7 @@ struct Variant
 		{
 			if (usType != op->usType)
 			{
-				//different types - exception
+				throw ex_typeMismatch;
 			}
 
 			const unsigned short len = op->usLength;
@@ -169,13 +175,13 @@ struct Variant
 			}
 			else
 			{
-				//exception if dict or null
+				throw ex_wrongType;
 			}
 			usLength = newLength;
 		}
 		else
 		{
-			//exception if num
+			throw ex_wrongType;
 		}
 	}
 

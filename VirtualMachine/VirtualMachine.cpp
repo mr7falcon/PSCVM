@@ -27,7 +27,10 @@ void VirtualMachine::Initialize()
 
 #ifdef _DEBUG
 	log.open("log.log");
-	//throw any exception if file did not opened
+	if (!log.is_open())
+	{
+		throw exception("file opening error");
+	}
 
 	g_memVar = 0;
 	g_memChunk = 1;
@@ -365,7 +368,7 @@ void VirtualMachine::Run(byte* program)
 			Variant* arr = m_pStack + m_nCapacity - offset;
 			if (index >= arr->usLength)
 			{
-				//throw any exception
+				throw Variant::ex_outOfBounds;
 			}
 			Variant* var = arr->Get(index);
 			var->Copy();
@@ -394,7 +397,7 @@ void VirtualMachine::Run(byte* program)
 			Variant* arr = m_pStack + m_nCapacity - offset;
 			if (index >= arr->usLength)
 			{
-				//throw any exception
+				throw Variant::ex_outOfBounds;
 			}
 			*(arr->Get(index)) = *(m_sp++);
 

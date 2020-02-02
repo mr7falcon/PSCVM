@@ -1,6 +1,11 @@
 #include "Variant.h"
 #include "VirtualMachine.h"
 
+const exception Variant::ex_keyMissing = exception("key is missing");
+const exception Variant::ex_typeMismatch = exception("type mismatch");
+const exception Variant::ex_wrongType = exception("operation can't be used with this type");
+const exception Variant::ex_outOfBounds = exception("index is out of bounds");
+
 Variant::~Variant()
 {
 }
@@ -398,8 +403,7 @@ Variant* Variant::Find(Variant* key) const
 		bucket = (Bucket*)bucket->next.pValue;
 	}
 
-	//key is missing - throw any exception
-	throw new std::exception("idi rabotay, suka!");
+	throw ex_keyMissing;
 }
 
 void Variant::Erase(Variant* key)
@@ -424,6 +428,5 @@ void Variant::Erase(Variant* key)
 		pBucket = (Bucket*)pBucket->next.pValue;
 	}
 
-	//key is missing - throw any exception
-	throw new std::exception("idi rabotay, suka!");
+	throw ex_keyMissing;
 }
