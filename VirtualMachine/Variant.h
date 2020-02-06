@@ -186,6 +186,7 @@ struct Variant
 	}
 
 	static bool Equal(Variant* op1, Variant* op2);
+	Variant Duplicate();
 
 	const string ToString() const;
 	static Variant FromBytes(byte** pc);

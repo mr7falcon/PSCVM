@@ -227,6 +227,10 @@ void VirtualMachine::HeapCollect()
 		delete(iter);
 		iter = next;
 	}
+
+#ifdef _DEBUG
+	LogMemory();
+#endif
 }
 
 void VirtualMachine::HeapMove(Variant* from, Variant* to)
@@ -264,7 +268,7 @@ void VirtualMachine::Run(byte* program)
 
 	while (true)
 	{
-		switch ((ByteCommand)*(pc++))
+		switch ((ByteCommand) * (pc++))
 		{
 		case ByteCommand::CALL:
 		{
@@ -305,7 +309,7 @@ void VirtualMachine::Run(byte* program)
 			Log("FETCH " + std::to_string(offset));
 #endif
 
-			*(--m_sp) = *(m_pStack + m_nCapacity - offset);
+			* (--m_sp) = *(m_pStack + m_nCapacity - offset);
 			m_sp->Copy();
 		}
 		break;
@@ -318,7 +322,7 @@ void VirtualMachine::Run(byte* program)
 			Log("STORE " + m_sp->ToString() + " " + std::to_string(offset));
 #endif
 
-			*(m_pStack + m_nCapacity - offset) = *(m_sp++);
+			* (m_pStack + m_nCapacity - offset) = *(m_sp++);
 		}
 		break;
 		case ByteCommand::LFETCH:
@@ -334,7 +338,7 @@ void VirtualMachine::Run(byte* program)
 			Log("LFETCH " + std::to_string(offset));
 #endif
 
-			*(--m_sp) = *(m_bp - offset);
+			* (--m_sp) = *(m_bp - offset);
 			m_sp->Copy();
 		}
 		break;
@@ -347,7 +351,7 @@ void VirtualMachine::Run(byte* program)
 			Log("LSTORE " + m_sp->ToString() + " " + std::to_string(offset));
 #endif
 
-			*(m_bp - offset) = *(m_sp++);
+			* (m_bp - offset) = *(m_sp++);
 		}
 		break;
 		//do we need to check a type for following commands?
@@ -461,7 +465,7 @@ void VirtualMachine::Run(byte* program)
 			const clock_t tStart = clock();
 #endif
 
-			*((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
+			* ((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
 			key->Free();
 
 #ifdef _DEBUG
@@ -574,7 +578,7 @@ void VirtualMachine::Run(byte* program)
 		{
 			Variant* op2 = m_sp;
 			Variant* op1 = ++m_sp;
-			
+
 #ifdef _DEBUG
 			Log("CONCAT " + op1->ToString() + " " + op2->ToString());
 
@@ -602,7 +606,7 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 			(m_pStack + m_nCapacity - offset)->PopBack();
-		
+
 #ifdef _DEBUG
 			const clock_t tEnd = clock();
 			LogTime(tEnd - tStart);
@@ -982,6 +986,16 @@ void VirtualMachine::Run(byte* program)
 
 			return;
 		}
+		break;
+		case ByteCommand::DUP:
+		{
+#ifdef _DEBUG
+			Log("DUP " + m_sp->ToString());
+#endif
+
+			*m_sp = m_sp->Duplicate();
+		}
+		break;
 		default:
 		{
 			return;

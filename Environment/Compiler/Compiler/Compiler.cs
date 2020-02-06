@@ -52,6 +52,7 @@ namespace Compiler
             APOP,
             DERASE,
             PRINT,
+            DUP,
         };
 
         public enum VarType : ushort
@@ -395,6 +396,9 @@ namespace Compiler
                         break;
                     case "PRINT":
                         AddByte((byte)ByteCommand.PRINT);
+                        break;
+                    case "DUP":
+                        AddByte((byte)ByteCommand.DUP);
                         break;
                     default:
                         if (command[command.Length - 1] == ':')

@@ -430,3 +430,61 @@ void Variant::Erase(Variant* key)
 
 	throw ex_keyMissing;
 }
+
+Variant Variant::Duplicate()
+{
+	if (usNull == c_null && usType == VarType::ARR)
+	{
+		Variant* pGlobalDesc1 = (Variant*)pValue;
+		Variant* pGlobalDesc2 = VirtualMachine::HeapAlloc(pGlobalDesc1->usCap);
+		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
+		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
+		Variant* pArr1 = pLocalDesc1 + 1;
+		Variant* pArr2 = pLocalDesc2 + 1;
+		unsigned short stop1 = pLocalDesc1->usCap;
+		unsigned short stop2 = pLocalDesc2->usCap;
+
+		if (usType == VarType::ARR)
+		{
+			while (true)
+			{
+				if (stop1 <= stop2)
+				{
+					memcpy(pArr2, pArr1, (unsigned int)stop1 * sizeof(Variant));
+					stop2 -= stop1;
+					pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
+
+					if (!pLocalDesc1)
+					{
+						break;
+					}
+
+					pArr2 += stop1;
+					stop1 = pLocalDesc1->usCap;
+					pArr1 = pLocalDesc1 + 1;
+				}
+				else
+				{
+					memcpy(pArr2, pArr1, (unsigned int)stop2 * sizeof(Variant));
+					stop1 -= stop2;
+					pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+
+					if (!pLocalDesc2)
+					{
+						break;
+					}
+
+					pArr1 += stop2;
+					stop2 = pLocalDesc2->usCap;
+					pArr2 = pLocalDesc2 + 1;
+				}
+			}
+
+			Variant var = Variant(pGlobalDesc2, usLength, VarType::ARR);
+			Free();
+			return var;
+		}
+	}
+
+	return *this;
+}

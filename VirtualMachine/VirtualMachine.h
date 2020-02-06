@@ -53,6 +53,7 @@ enum ByteCommand : byte
 	APOP,
 	DERASE,
 	PRINT,
+	DUP,
 };
 
 class VirtualMachine
