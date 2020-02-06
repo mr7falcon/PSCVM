@@ -100,37 +100,7 @@ struct Variant
 
 	void Insert(Variant* key, Variant* val);	//same as PushBack
 
-	inline const long GetHash() const
-	{
-		long hash = 0;
-
-		if (usNull == c_null)
-		{
-			if (usType == VarType::STR)
-			{
-				static const unsigned short p = 73;
-				long long p_pow = p;
-				const char* pStop = (char*)pValue + usLength;
-				for (char* str = (char*)pValue; str < pStop; ++str)
-				{
-					hash += (long)(*str * p_pow);
-					p_pow *= p;
-				}
-			}
-			else if (usType == VarType::ARR)
-			{
-			}
-			else if (usType == VarType::DICT)
-			{
-			}
-		}
-		else
-		{
-			hash = lValue;
-		}
-
-		return hash;
-	}
+	const long GetHash() const;
 
 	inline void PopBack() noexcept
 	{

@@ -488,3 +488,82 @@ Variant Variant::Duplicate()
 
 	return *this;
 }
+
+const long Variant::GetHash() const
+{
+	long hash = 0;
+
+	if (usNull == c_null)
+	{
+		if (usType == VarType::STR)
+		{
+			static const unsigned short p = 73;
+			long long p_pow = p;
+			const char* pStop = (char*)pValue + usLength;
+			for (char* str = (char*)pValue; str < pStop; ++str)
+			{
+				hash += (long)(*str * p_pow);
+				p_pow *= p;
+			}
+		}
+		else
+		{
+			Variant* pGlobalDesc = (Variant*)pValue;
+			Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
+			Variant* pArr = pLocalDesc + 1;
+			Variant* stop = pArr + pLocalDesc->usCap;
+
+			if (usType == VarType::ARR)
+			{
+				for (unsigned short i = 0; i < usLength; ++i)
+				{
+					if (pArr == stop)
+					{
+						pLocalDesc = (Variant*)pLocalDesc->pValue;
+						pArr = pLocalDesc + 1;
+						stop = pArr + pLocalDesc->usCap;
+					}
+
+					hash ^= pArr->GetHash();
+					++pArr;
+				}
+			}
+			else if (usType == VarType::DICT)
+			{
+				unsigned short length = usLength;
+				Bucket* bucket;
+				while (true)
+				{
+					const unsigned short capacity = pLocalDesc->usCap;
+
+					for (; pArr <= stop; ++pArr)
+					{
+						if (pArr->pValue)
+						{
+							bucket = (Bucket*)pArr->pValue;
+							while (bucket)
+							{
+								hash ^= (bucket->key.GetHash() - bucket->value.GetHash());
+								bucket = (Bucket*)bucket->next.pValue;
+								if (--length == 0)
+								{
+									return hash;
+								}
+							}
+						}
+					}
+
+					pLocalDesc = (Variant*)pLocalDesc->pValue;
+					pArr = pLocalDesc + 1;
+					stop = pArr + pLocalDesc->usCap;
+				}
+			}
+		}
+	}
+	else
+	{
+		hash = lValue;
+	}
+
+	return hash;
+}
