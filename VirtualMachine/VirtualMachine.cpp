@@ -354,13 +354,16 @@ void VirtualMachine::Run(byte* program)
 			* (m_bp - offset) = *(m_sp++);
 		}
 		break;
-		//do we need to check a type for following commands?
 		case ByteCommand::AFETCH:
 		{
 			const int offset = *((int*)pc);
 			pc += sizeof(int);
 
-			m_sp->Free();
+			if (m_sp->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
+
 			const unsigned short index = (unsigned short)m_sp->dValue;
 
 #ifdef _DEBUG
@@ -389,7 +392,11 @@ void VirtualMachine::Run(byte* program)
 			const int offset = *((int*)pc);
 			pc += sizeof(int);
 
-			m_sp->Free();
+			if (m_sp->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
+
 			const unsigned short index = (unsigned short)(m_sp++)->dValue;
 
 #ifdef _DEBUG
@@ -527,10 +534,13 @@ void VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::ARRAY:
 		{
-			m_sp->Free();
+			if (m_sp->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
+			
 			const unsigned short len = (unsigned short)m_sp->dValue;
-			//throw any exception if there's NaN;
-
+			
 #ifdef _DEBUG
 			Log("ARR " + std::to_string(len));
 
@@ -554,10 +564,13 @@ void VirtualMachine::Run(byte* program)
 		break;
 		case ByteCommand::DICTIONARY:
 		{
-			m_sp->Free();
+			if (m_sp->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
+			
 			const unsigned short len = (unsigned short)m_sp->dValue;
-			//throw any exception if there's NaN;
-
+			
 #ifdef _DEBUG
 			Log("DICT " + std::to_string(len));
 
