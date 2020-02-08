@@ -2,6 +2,7 @@
 #include <cstring>
 #include <iostream>
 
+const exception VirtualMachine::ex_argDoesntExists = exception("Argument does not exists");
 Variant* VirtualMachine::m_pStack;
 VirtualMachine::HeapChunk* VirtualMachine::m_pFirstChunk;
 VirtualMachine::HeapChunk* VirtualMachine::m_pCurrentChunk;
@@ -9,6 +10,7 @@ Variant* VirtualMachine::m_sp;
 Variant* VirtualMachine::m_pCurrentSlot;
 Variant* VirtualMachine::m_bp;
 int VirtualMachine::m_nCapacity;
+byte* VirtualMachine::m_bArgs[4];
 #ifdef _DEBUG
 std::ofstream VirtualMachine::log;
 long VirtualMachine::g_memVar;
@@ -1009,6 +1011,54 @@ void VirtualMachine::Run(byte* program)
 			*m_sp = m_sp->Duplicate();
 		}
 		break;
+		case ByteCommand::NARG:
+		{
+			if (m_sp - 1 == m_bp)
+			{
+				Resize();
+			}
+			const byte offset = *((byte*)pc);
+			pc += sizeof(byte);
+
+#ifdef _DEBUG
+			Log("NARG " + std::to_string(offset));
+#endif
+
+			byte* arg = *(m_bArgs + offset);
+			if (offset > c_bArgsCount || !arg)
+			{
+				throw ex_argDoesntExists;
+			}
+
+			*(--m_sp) = Variant(*((double*)arg));
+		}
+		break;
+		case ByteCommand::SARG:
+		{
+			if (m_sp - 1 == m_bp)
+			{
+				Resize();
+			}
+			const byte offset = *((byte*)pc);
+			pc += sizeof(byte);
+
+#ifdef _DEBUG
+			Log("SARG " + std::to_string(offset));
+#endif
+
+			byte* arg = *(m_bArgs + offset);
+			if (offset > c_bArgsCount || !arg)
+			{
+				throw ex_argDoesntExists;
+			}
+
+			char* sArg = reinterpret_cast<char*>(arg);
+			const unsigned short len = (unsigned short)(strchr(sArg, '\0') - sArg);
+			char* str = new char[len];
+			memcpy(str, sArg, len);
+			*(--m_sp) = Variant(str, len);
+		}
+		break;
 		default:
 		{
 			return;
@@ -1019,29 +1069,90 @@ void VirtualMachine::Run(byte* program)
 
 extern "C"
 {
-	__declspec(dllexport) void __stdcall Run(byte* program)
+	__declspec(dllexport) void __stdcall Run0(byte* program)
 	{
-		VirtualMachine::Initialize();
-		VirtualMachine::Run(program);
-		VirtualMachine::ShutDown();
+		return Run(program);
 	}
 
-	__declspec(dllexport) double __stdcall NumRun(byte* program)
+	__declspec(dllexport) void __stdcall Run1(byte* program, byte* arg0)
 	{
-		VirtualMachine::Initialize();
-		VirtualMachine::Run(program);
-		double num = VirtualMachine::Return().dValue;
-		VirtualMachine::ShutDown();
-		return num;
+		VirtualMachine::ProvideArgs(arg0);
+		Run(program);
 	}
 
-	__declspec(dllexport) void __stdcall StrRun(byte* program, char* res)
+	__declspec(dllexport) void __stdcall Run2(byte* program, byte* arg0, byte* arg1)
 	{
-		VirtualMachine::Initialize();
-		VirtualMachine::Run(program);
-		Variant var = VirtualMachine::Return();
-		memcpy(res, var.pValue, var.usLength);
-		*(res + var.usLength) = '\0';
-		VirtualMachine::ShutDown();
+		VirtualMachine::ProvideArgs(arg0, arg1);
+		Run(program);
+	}
+
+	__declspec(dllexport) void __stdcall Run3(byte* program, byte* arg0, byte* arg1, byte* arg2)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1, arg2);
+		Run(program);
+	}
+
+	__declspec(dllexport) void __stdcall Run4(byte* program, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1, arg2, arg3);
+		Run(program);
+	}
+
+	__declspec(dllexport) double __stdcall NumRun0(byte* program)
+	{
+		return NumRun(program);
+	}
+
+	__declspec(dllexport) double __stdcall NumRun1(byte* program, byte* arg0)
+	{
+		VirtualMachine::ProvideArgs(arg0);
+		return NumRun(program);
+	}
+
+	__declspec(dllexport) double __stdcall NumRun2(byte* program, byte* arg0, byte* arg1)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1);
+		return NumRun(program);
+	}
+
+	__declspec(dllexport) double __stdcall NumRun3(byte* program, byte* arg0, byte* arg1, byte* arg2)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1, arg2);
+		return NumRun(program);
+	}
+
+	__declspec(dllexport) double __stdcall NumRun4(byte* program, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1, arg2, arg3);
+		return NumRun(program);
+	}
+
+	__declspec(dllexport) void __stdcall StrRun0(byte* program, char* res)
+	{
+		return StrRun(program, res);
+	}
+
+	__declspec(dllexport) void __stdcall StrRun1(byte* program, char* res, byte* arg0)
+	{
+		VirtualMachine::ProvideArgs(arg0);
+		return StrRun(program, res);
+	}
+
+	__declspec(dllexport) void __stdcall StrRun2(byte* program, char* res, byte* arg0, byte* arg1)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1);
+		return StrRun(program, res);
+	}
+
+	__declspec(dllexport) void __stdcall StrRun3(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1, arg2);
+		return StrRun(program, res);
+	}
+
+	__declspec(dllexport) void __stdcall StrRun4(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
+	{
+		VirtualMachine::ProvideArgs(arg0, arg1, arg2, arg3);
+		return StrRun(program, res);
 	}
 }

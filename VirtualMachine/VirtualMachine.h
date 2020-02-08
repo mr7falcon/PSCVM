@@ -54,11 +54,15 @@ enum ByteCommand : byte
 	DERASE,
 	PRINT,
 	DUP,
+	NARG,
+	SARG,
 };
 
 class VirtualMachine
 {
 public:
+	static const exception ex_argDoesntExists;
+
 	static inline void Initialize();
 	static inline void ShutDown();
 
@@ -272,8 +276,14 @@ public:
 	}
 
 	static inline void Run(byte* program);
-
 	static inline Variant Return() { return *m_sp; }
+	static inline void ProvideArgs(byte* arg0 = nullptr, byte* arg1 = nullptr, byte* arg2 = nullptr, byte* arg3 = nullptr)
+	{
+		m_bArgs[0] = arg0;
+		m_bArgs[1] = arg1;
+		m_bArgs[2] = arg2;
+		m_bArgs[3] = arg3;
+	}
 
 private:
 	VirtualMachine();
@@ -312,6 +322,9 @@ private:
 	static HeapChunk* m_pCurrentChunk;
 	static Variant* m_pCurrentSlot;
 
+	static const byte c_bArgsCount = 4;
+	static byte* m_bArgs[c_bArgsCount];
+
 #ifdef _DEBUG
 	static std::ofstream log;
 	static inline void Log(const string messege)
@@ -331,3 +344,29 @@ private:
 	static int g_memChunk;
 #endif
 };
+
+inline void Run(byte* program)
+{
+	VirtualMachine::Initialize();
+	VirtualMachine::Run(program);
+	VirtualMachine::ShutDown();
+}
+
+inline double NumRun(byte* program)
+{
+	VirtualMachine::Initialize();
+	VirtualMachine::Run(program);
+	double num = VirtualMachine::Return().dValue;
+	VirtualMachine::ShutDown();
+	return num;
+}
+
+inline void StrRun(byte* program, char* res)
+{
+	VirtualMachine::Initialize();
+	VirtualMachine::Run(program);
+	Variant var = VirtualMachine::Return();
+	memcpy(res, var.pValue, var.usLength);
+	*(res + var.usLength) = '\0';
+	VirtualMachine::ShutDown();
+}

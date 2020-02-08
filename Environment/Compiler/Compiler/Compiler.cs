@@ -53,6 +53,8 @@ namespace Compiler
             DERASE,
             PRINT,
             DUP,
+            NARG,
+            SARG,
         };
 
         public enum VarType : ushort
@@ -399,6 +401,22 @@ namespace Compiler
                         break;
                     case "DUP":
                         AddByte((byte)ByteCommand.DUP);
+                        break;
+                    case "NARG":
+                        {
+                            AddByte((byte)ByteCommand.NARG);
+                            ClearSpaces();
+                            string op = Split();
+                            AddByte(byte.Parse(op));
+                        }
+                        break;
+                    case "SARG":
+                        {
+                            AddByte((byte)ByteCommand.SARG);
+                            ClearSpaces();
+                            string op = Split();
+                            AddByte(byte.Parse(op));
+                        }
                         break;
                     default:
                         if (command[command.Length - 1] == ':')
