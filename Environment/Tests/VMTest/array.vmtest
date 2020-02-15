@@ -1,0 +1,4 @@
+PUSH 3
+ARR
+PRINT
+HALT

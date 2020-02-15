@@ -1,0 +1,7 @@
+PUSH 0
+JZ mark
+HALT
+mark:
+PUSH 'DONE'
+PRINT
+HALT

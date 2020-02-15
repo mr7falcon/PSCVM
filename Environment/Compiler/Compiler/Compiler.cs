@@ -61,7 +61,8 @@ namespace Compiler
         {
             STR,
             ARR,
-            DICT
+            DICT,
+            NIL
         }
 
         private const ushort c_null = 0x7FF0;
@@ -188,7 +189,7 @@ namespace Compiler
                 {
                     List<byte> bytes = new List<byte>();
                     bytes.AddRange(BitConverter.GetBytes(c_null));
-                    bytes.AddRange(BitConverter.GetBytes((ushort)0));
+                    bytes.AddRange(BitConverter.GetBytes((ushort)VarType.NIL));
                     bytes.AddRange(BitConverter.GetBytes((uint)0));
                     bts = bytes.ToArray();
                 }

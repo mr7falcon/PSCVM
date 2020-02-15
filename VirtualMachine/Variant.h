@@ -13,7 +13,8 @@ enum VarType : unsigned short
 {
 	STR,
 	ARR,
-	DICT
+	DICT,
+	NIL,
 };
 
 struct Variant
@@ -28,7 +29,9 @@ struct Variant
 
 	inline Variant()
 		: pValue(nullptr),
-		  usNull(c_null)
+		  usNull(c_null),
+		  usType(VarType::NIL),
+		  nLength(0)
 	{}
 
 	inline Variant(const double val)
@@ -52,7 +55,7 @@ struct Variant
 
 	inline Variant(const unsigned int cap, Variant* next = nullptr)
 		: nCap(cap),
-		  rc(1),
+		  nReplaced(0),
 		  pValue(next)
 	{}
 
@@ -60,40 +63,24 @@ struct Variant
 
 	inline void Free()
 	{
-		if (usNull == c_null)
+		if (usNull == c_null && usType == VarType::STR)
 		{
-			if (usType == VarType::STR)
+			char* ptr = (char*)pValue - sizeof(unsigned int);
+			if (--(*((unsigned int*)ptr)) == 0)
 			{
-				char* ptr = (char*)pValue - sizeof(unsigned int);
-				if (--(*((unsigned int*)ptr)) == 0)
-				{
-					delete[](ptr);
-				}
-			}
-			else if (usType == VarType::ARR || usType == VarType::DICT)
-			{
-				Variant* pGlobalDesc = (Variant*)pValue;
-				if (--pGlobalDesc->rc == 0)
-				{
-					pGlobalDesc->pValue = nullptr;
-				}
+				delete[](ptr);
 			}
 		}
 	}
 
 	inline void Copy()
 	{
-		if (usNull == c_null)
+		if (usNull == c_null && usType == VarType::STR)
 		{
 			if (usType == VarType::STR)
 			{
 				char* ptr = (char*)pValue - sizeof(unsigned int);
 				++(*((unsigned int*)ptr));
-			}
-			else if (usType == VarType::ARR || usType == VarType::DICT)
-			{
-				Variant* pGlobalDesc = (Variant*)pValue;
-				++pGlobalDesc->rc;
 			}
 		}
 	}
@@ -195,7 +182,7 @@ struct Variant
 		struct
 		{
 			unsigned int nCap;
-			unsigned int rc;
+			unsigned int nReplaced;
 		};
 	};
 

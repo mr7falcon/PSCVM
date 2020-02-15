@@ -131,7 +131,7 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 			return;
 		}
 
-		if (((unsigned long long)pValue->pValue & 1) == 0)
+		if (pValue->nReplaced == 0)
 		{
 			const unsigned int length = from->nLength;
 			Variant* pGlobDesc = pValue;
@@ -212,7 +212,8 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 				}
 			}
 
-			pGlobDesc->pValue = (void*)((unsigned long long)to->pValue | 1);
+			pGlobDesc->nReplaced = 1;
+			pGlobDesc->pValue = to->pValue;
 		}
 		else
 		{
@@ -695,8 +696,10 @@ void VirtualMachine::Run(byte* program)
 			Log("ADD " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue += op2->dValue;
 		}
 		break;
@@ -709,8 +712,10 @@ void VirtualMachine::Run(byte* program)
 			Log("SUB " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue -= op2->dValue;
 		}
 		break;
@@ -724,7 +729,10 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 			Variant* var = (m_pStack + m_nCapacity - offset);
-			var->Free();
+			if (var->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			++var->dValue;
 		}
 		break;
@@ -738,7 +746,10 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 			Variant* var = (m_pStack + m_nCapacity - offset);
-			var->Free();
+			if (var->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			--var->dValue;
 		}
 		break;
@@ -751,8 +762,10 @@ void VirtualMachine::Run(byte* program)
 			Log("MULT " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue *= op2->dValue;
 		}
 		break;
@@ -765,8 +778,10 @@ void VirtualMachine::Run(byte* program)
 			Log("DIV " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 
 			if (op2->dValue != 0.0)
 			{
@@ -787,8 +802,10 @@ void VirtualMachine::Run(byte* program)
 			Log("MOD " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 
 			if (op2->dValue != 0.0)
 			{
@@ -809,8 +826,10 @@ void VirtualMachine::Run(byte* program)
 			Log("AND " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue = (op1->dValue != 0.0 && op2->dValue != 0.0
 				&& op1->usNull != Variant::c_null && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
 		}
@@ -824,8 +843,10 @@ void VirtualMachine::Run(byte* program)
 			Log("OR " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue = (op1->dValue != 0.0 && op1->usNull != Variant::c_null
 				|| op2->dValue != 0.0 && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
 		}
@@ -835,9 +856,11 @@ void VirtualMachine::Run(byte* program)
 #ifdef _DEBUG
 			Log("NOT " + m_sp->ToString());
 #endif
-
-			m_sp->dValue = (m_sp->dValue == 0.0 || m_sp->usNull == Variant::c_null) ? 1.0 : 0.0;
-			m_sp->Free();
+			if (m_sp->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
+			m_sp->dValue = m_sp->dValue == 0.0 ? 1.0 : 0.0;
 		}
 		break;
 		case ByteCommand::LT:
@@ -849,8 +872,10 @@ void VirtualMachine::Run(byte* program)
 			Log("LT " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue = op1->dValue < op2->dValue ? 1.0 : 0.0;
 		}
 		break;
@@ -863,8 +888,10 @@ void VirtualMachine::Run(byte* program)
 			Log("GT " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue = op1->dValue > op2->dValue ? 1.0 : 0.0;
 		}
 		break;
@@ -877,8 +904,10 @@ void VirtualMachine::Run(byte* program)
 			Log("LET " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue = op1->dValue <= op2->dValue ? 1.0 : 0.0;
 		}
 		break;
@@ -891,8 +920,10 @@ void VirtualMachine::Run(byte* program)
 			Log("GET " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			op1->Free();
-			op2->Free();
+			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			{
+				throw Variant::ex_wrongType;
+			}
 			op1->dValue = op1->dValue >= op2->dValue ? 1.0 : 0.0;
 		}
 		break;

@@ -129,91 +129,98 @@ int main(int argc, char** argv)
 
 	const unsigned int tStart = clock();
 
-	switch (rtype)
+	try
 	{
-	case ReturnTypes::V:
-	{
-		switch (argc)
+		switch (rtype)
 		{
-		case 3:
-			Run0(code);
-			break;
-		case 4:
-			Run1(code, ArgToByte(argv[3]));
-			break;
-		case 5:
-			Run2(code, ArgToByte(argv[3]), ArgToByte(argv[4]));
-			break;
-		case 6:
-			Run3(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]));
-			break;
-		case 7:
-			Run4(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]), ArgToByte(argv[6]));
-			break;
-		default:
-			std::cout << "max arguments count is 4" << std::endl;
-			return 1;
+		case ReturnTypes::V:
+		{
+			switch (argc)
+			{
+			case 3:
+				Run0(code);
+				break;
+			case 4:
+				Run1(code, ArgToByte(argv[3]));
+				break;
+			case 5:
+				Run2(code, ArgToByte(argv[3]), ArgToByte(argv[4]));
+				break;
+			case 6:
+				Run3(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]));
+				break;
+			case 7:
+				Run4(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]), ArgToByte(argv[6]));
+				break;
+			default:
+				std::cout << "max arguments count is 4" << std::endl;
+				return 1;
+			}
+		}
+		break;
+		case ReturnTypes::N:
+		{
+			double num = 0;
+
+			switch (argc)
+			{
+			case 3:
+				num = NumRun0(code);
+				break;
+			case 4:
+				num = NumRun1(code, ArgToByte(argv[3]));
+				break;
+			case 5:
+				num = NumRun2(code, ArgToByte(argv[3]), ArgToByte(argv[4]));
+				break;
+			case 6:
+				num = NumRun3(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]));
+				break;
+			case 7:
+				num = NumRun4(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]), ArgToByte(argv[6]));
+				break;
+			default:
+				std::cout << "max arguments count is 4" << std::endl;
+				return 1;
+			}
+
+			std::cout << num << std::endl;
+		}
+		break;
+		case ReturnTypes::S:
+		{
+			char str[100];
+
+			switch (argc)
+			{
+			case 3:
+				StrRun0(code, str);
+				break;
+			case 4:
+				StrRun1(code, str, ArgToByte(argv[3]));
+				break;
+			case 5:
+				StrRun2(code, str, ArgToByte(argv[3]), ArgToByte(argv[4]));
+				break;
+			case 6:
+				StrRun3(code, str, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]));
+				break;
+			case 7:
+				StrRun4(code, str, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]), ArgToByte(argv[6]));
+				break;
+			default:
+				std::cout << "max arguments count is 4" << std::endl;
+				return 1;
+			}
+
+			std::cout << str << std::endl;
+		}
+		break;
 		}
 	}
-	break;
-	case ReturnTypes::N:
+	catch (std::exception& ex)
 	{
-		double num = 0;
-
-		switch (argc)
-		{
-		case 3:
-			num = NumRun0(code);
-			break;
-		case 4:
-			num = NumRun1(code, ArgToByte(argv[3]));
-			break;
-		case 5:
-			num = NumRun2(code, ArgToByte(argv[3]), ArgToByte(argv[4]));
-			break;
-		case 6:
-			num = NumRun3(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]));
-			break;
-		case 7:
-			num = NumRun4(code, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]), ArgToByte(argv[6]));
-			break;
-		default:
-			std::cout << "max arguments count is 4" << std::endl;
-			return 1;
-		}
-
-		std::cout << num << std::endl;
-	}
-	break;
-	case ReturnTypes::S:
-	{
-		char str[100];
-
-		switch (argc)
-		{
-		case 3:
-			StrRun0(code, str);
-			break;
-		case 4:
-			StrRun1(code, str, ArgToByte(argv[3]));
-			break;
-		case 5:
-			StrRun2(code, str, ArgToByte(argv[3]), ArgToByte(argv[4]));
-			break;
-		case 6:
-			StrRun3(code, str, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]));
-			break;
-		case 7:
-			StrRun4(code, str, ArgToByte(argv[3]), ArgToByte(argv[4]), ArgToByte(argv[5]), ArgToByte(argv[6]));
-			break;
-		default:
-			std::cout << "max arguments count is 4" << std::endl;
-			return 1;
-		}
-
-		std::cout << str << std::endl;
-	}
-	break;
+		std::cout << ex.what() << std::endl;
 	}
 
 	const unsigned int tEnd = clock();
