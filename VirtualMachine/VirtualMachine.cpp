@@ -42,12 +42,22 @@ void VirtualMachine::Initialize()
 
 void VirtualMachine::ShutDown()
 {
-	for (Variant* iter = m_pStack; iter < m_pStack + m_nCapacity; ++iter)
+	for (Variant* iter = m_pStack; iter <= m_bp; ++iter)
 	{
-		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR && iter->pValue)
+		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
 		{
-			delete[]((char*)iter->pValue);
-			iter->pValue = nullptr;
+			char* str = (char*)iter->pValue - sizeof(unsigned int);
+			delete[](str);
+		}
+	}
+
+	const Variant* pStop = m_pStack + m_nCapacity;
+	for (Variant* iter = m_sp; iter < pStop; ++iter)
+	{
+		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
+		{
+			char* str = (char*)iter->pValue - sizeof(unsigned int);
+			delete[](str);
 		}
 	}
 
@@ -121,36 +131,36 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 			return;
 		}
 
-		if (!pValue->usReplaced)
+		if (((unsigned long long)pValue->pValue & 1) == 0)
 		{
-			const unsigned short length = from->usLength;
+			const unsigned int length = from->nLength;
 			Variant* pGlobDesc = pValue;
-			const unsigned short capacity = pGlobDesc->usCap;
+			const unsigned int capacity = pGlobDesc->nCap;
 			Variant* iter = HeapAlloc(capacity);
 			to->pValue = iter;
 			Variant* pIterLocalDesc = (Variant*)iter->pValue;
 			iter = pIterLocalDesc + 1;
-			Variant* iterStop = iter + pIterLocalDesc->usCap;
+			Variant* iterStop = iter + pIterLocalDesc->nCap;
 			Variant* pLocalDesc = (Variant*)pGlobDesc->pValue;
 			Variant* pArr = pLocalDesc + 1;
-			Variant* stop = pArr + pLocalDesc->usCap;
+			Variant* stop = pArr + pLocalDesc->nCap;
 
 			if (type == ARR)
 			{
-				for (unsigned short i = 0; i < length; ++i)
+				for (unsigned int i = 0; i < length; ++i)
 				{
 					if (pArr == stop)
 					{
 						pLocalDesc = (Variant*)pLocalDesc->pValue;
 						pArr = pLocalDesc + 1;
-						stop = pArr + pLocalDesc->usCap;
+						stop = pArr + pLocalDesc->nCap;
 					}
 
 					if (iter == iterStop)
 					{
 						pIterLocalDesc = (Variant*)pIterLocalDesc->pValue;
 						iter = pLocalDesc + 1;
-						iterStop = iter + pIterLocalDesc->usCap;
+						iterStop = iter + pIterLocalDesc->nCap;
 					}
 
 					HeapMove(pArr, iter);
@@ -161,14 +171,14 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 			else if (type == VarType::DICT)
 			{
 				Variant* pBucketDesc = HeapAllocStructArr(length);
-				unsigned short nBucketCap = pBucketDesc->usCap;
+				unsigned int nBucketCap = pBucketDesc->nCap;
 				Bucket* pBucketArr = (Bucket*)(pBucketDesc + 1);
 				Bucket* pNewBucket = pBucketArr;
 				Bucket* pBucket;
 
 				while (pLocalDesc)
 				{
-					const unsigned short capacity = pLocalDesc->usCap;
+					const unsigned int capacity = pLocalDesc->nCap;
 					
 					for (; pArr <= pLocalDesc + capacity; ++pArr, ++iter)
 					{
@@ -189,7 +199,7 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 								if (++pNewBucket == pBucketArr + nBucketCap)
 								{
 									pBucketDesc = (Variant*)pBucketDesc->pValue;
-									nBucketCap = pBucketDesc->usCap;
+									nBucketCap = pBucketDesc->nCap;
 									pBucketArr = (Bucket*)(pBucketDesc + 1);
 									pNewBucket = pBucketArr;
 								}
@@ -202,8 +212,7 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 				}
 			}
 
-			pGlobDesc->usReplaced = 1;
-			pGlobDesc->pValue = to->pValue;
+			pGlobDesc->pValue = (void*)((unsigned long long)to->pValue | 1);
 		}
 		else
 		{
@@ -217,7 +226,13 @@ void VirtualMachine::HeapCollect()
 	HeapChunk* pFirstChunk = m_pCurrentChunk = new HeapChunk;
 	m_pCurrentSlot = m_pCurrentChunk->vData;
 
-	for (Variant* sp = m_sp; sp < m_pStack + m_nCapacity; ++sp)
+	for (Variant* bp = m_pStack; bp <= m_bp; ++bp)
+	{
+		CheckReferences(bp, bp);
+	}
+
+	const Variant* pStop = m_pStack + m_nCapacity;
+	for (Variant* sp = m_sp; sp < pStop; ++sp)
 	{
 		CheckReferences(sp, sp);
 	}
@@ -367,7 +382,7 @@ void VirtualMachine::Run(byte* program)
 				throw Variant::ex_wrongType;
 			}
 
-			const unsigned short index = (unsigned short)m_sp->dValue;
+			const unsigned int index = (unsigned int)m_sp->dValue;
 
 #ifdef _DEBUG
 			Log("AFETCH " + std::to_string(offset) + " " + std::to_string(index));
@@ -376,7 +391,7 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 			Variant* arr = m_pStack + m_nCapacity - offset;
-			if (index >= arr->usLength)
+			if (index >= arr->nLength)
 			{
 				throw Variant::ex_outOfBounds;
 			}
@@ -400,7 +415,7 @@ void VirtualMachine::Run(byte* program)
 				throw Variant::ex_wrongType;
 			}
 
-			const unsigned short index = (unsigned short)(m_sp++)->dValue;
+			const unsigned int index = (unsigned int)(m_sp++)->dValue;
 
 #ifdef _DEBUG
 			Log("ASTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
@@ -409,7 +424,7 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 			Variant* arr = m_pStack + m_nCapacity - offset;
-			if (index >= arr->usLength)
+			if (index >= arr->nLength)
 			{
 				throw Variant::ex_outOfBounds;
 			}
@@ -542,7 +557,7 @@ void VirtualMachine::Run(byte* program)
 				throw Variant::ex_wrongType;
 			}
 			
-			const unsigned short len = (unsigned short)m_sp->dValue;
+			const unsigned int len = (unsigned short)m_sp->dValue;
 			
 #ifdef _DEBUG
 			Log("ARR " + std::to_string(len));
@@ -550,8 +565,8 @@ void VirtualMachine::Run(byte* program)
 			const clock_t tStart = clock();
 #endif
 
-			unsigned short capacity = len + (len >> Variant::c_capInc);
-			const unsigned short minCapacity = 8;
+			unsigned int capacity = len + (len >> Variant::c_capInc);
+			static const unsigned char minCapacity = 8;
 			if (capacity < minCapacity)
 			{
 				capacity = minCapacity;
@@ -572,7 +587,7 @@ void VirtualMachine::Run(byte* program)
 				throw Variant::ex_wrongType;
 			}
 			
-			const unsigned short len = (unsigned short)m_sp->dValue;
+			const unsigned int len = (unsigned int)m_sp->dValue;
 			
 #ifdef _DEBUG
 			Log("DICT " + std::to_string(len));
@@ -580,7 +595,7 @@ void VirtualMachine::Run(byte* program)
 			const clock_t tStart = clock();
 #endif
 
-			const unsigned short capacity = GetPrime(len + (len >> Variant::c_capInc));
+			const unsigned int capacity = GetPrime(len + (len >> Variant::c_capInc));
 			Variant* dict = VirtualMachine::HeapAlloc(capacity);
 			*m_sp = Variant(dict, 0, VarType::DICT);
 
@@ -1054,8 +1069,10 @@ void VirtualMachine::Run(byte* program)
 			}
 
 			char* sArg = reinterpret_cast<char*>(arg);
-			const unsigned short len = (unsigned short)(strchr(sArg, '\0') - sArg);
-			char* str = new char[len];
+			const unsigned int len = (unsigned int)(strchr(sArg, '\0') - sArg);
+			char* str = new char[len + sizeof(int)];
+			*((unsigned int*)str) = 1;
+			str += sizeof(unsigned int);
 			memcpy(str, sArg, len);
 			*(--m_sp) = Variant(str, len);
 		}

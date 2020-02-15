@@ -36,25 +36,23 @@ struct Variant
 		  dValue(val)
 	{}
 
-	inline Variant(char* str, const unsigned short length)
+	inline Variant(char* str, const unsigned int length)
 		: usNull(c_null),
 		  usType(VarType::STR),
-		  usLength(length),
-		  usRef(1),
+		  nLength(length),
 		  pValue(str)
 	{}
 
-	inline Variant(Variant* var, const unsigned short length, const unsigned short type)
+	inline Variant(Variant* var, const unsigned int length, const unsigned short type)
 		: usNull(c_null),
 		  usType(type),
-		  usLength(length),
-		  usRef(1),
+		  nLength(length),
 		  pValue(var)
 	{}
 
-	inline Variant(const unsigned short cap, Variant* next = nullptr)
-		: usCap(cap),
-		  usReplaced(0),
+	inline Variant(const unsigned int cap, Variant* next = nullptr)
+		: nCap(cap),
+		  rc(1),
 		  pValue(next)
 	{}
 
@@ -62,33 +60,51 @@ struct Variant
 
 	inline void Free()
 	{
-		if (usNull == c_null && --usRef == 0)
+		if (usNull == c_null)
 		{
 			if (usType == VarType::STR)
 			{
-				delete[]((char*)pValue);
+				char* ptr = (char*)pValue - sizeof(unsigned int);
+				if (--(*((unsigned int*)ptr)) == 0)
+				{
+					delete[](ptr);
+				}
 			}
-
-			usNull = c_null;
-			pValue = nullptr;
+			else if (usType == VarType::ARR || usType == VarType::DICT)
+			{
+				Variant* pGlobalDesc = (Variant*)pValue;
+				if (--pGlobalDesc->rc == 0)
+				{
+					pGlobalDesc->pValue = nullptr;
+				}
+			}
 		}
 	}
 
-	inline void Copy() noexcept
+	inline void Copy()
 	{
-		if (pValue)
+		if (usNull == c_null)
 		{
-			++usRef;
+			if (usType == VarType::STR)
+			{
+				char* ptr = (char*)pValue - sizeof(unsigned int);
+				++(*((unsigned int*)ptr));
+			}
+			else if (usType == VarType::ARR || usType == VarType::DICT)
+			{
+				Variant* pGlobalDesc = (Variant*)pValue;
+				++pGlobalDesc->rc;
+			}
 		}
 	}
 
-	inline Variant* Get(const unsigned short i) const
+	inline Variant* Get(const unsigned int i) const
 	{
 		Variant* p = (Variant*)((Variant*)pValue)->pValue;
-		unsigned short index = i;
-		while (index >= p->usCap)
+		unsigned int index = i;
+		while (index >= p->nCap)
 		{
-			index -= p->usCap;
+			index -= p->nCap;
 			p = (Variant*)p->pValue;
 		}
 		return p + 1 + index;
@@ -104,7 +120,7 @@ struct Variant
 
 	inline void PopBack() noexcept
 	{
-		--usLength;
+		--nLength;
 	}
 
 	void Erase(Variant* key); //same with Bucket
@@ -118,36 +134,39 @@ struct Variant
 				throw ex_typeMismatch;
 			}
 
-			const unsigned short len = op->usLength;
-			const unsigned short newLength = usLength + len;
+			const unsigned int len = op->nLength;
+			const unsigned int newLength = nLength + len;
 			if (usType == VarType::STR)
 			{
-				char* res = new char[newLength];
-				memcpy(res, pValue, usLength);
-				delete[]((char*)pValue);
-				memcpy(res + usLength, op->pValue, len);
+				char* res = new char[newLength + sizeof(unsigned int)];
+				char* ptr = (char*)pValue - sizeof(unsigned int);
+				*((unsigned int*)res) = *((unsigned int*)ptr);
+				res += sizeof(unsigned int);
+				memcpy(res, pValue, nLength);
+				delete[]((char*)ptr);
+				memcpy(res + nLength, op->pValue, len);
 				pValue = res;
 			}
 			else if (usType == VarType::ARR)
 			{
 				Variant* pGlobalDesc = (Variant*)pValue;
 				Variant* p = (Variant*)pGlobalDesc->pValue;
-				int i = usLength - p->usCap;
+				int i = nLength - p->nCap;
 				while (i > 0)
 				{
 					p = (Variant*)p->pValue;
-					i -= p->usCap;
+					i -= p->nCap;
 				}
 				const Variant* pGlobalDescOp = (Variant*)op->pValue;
 				p->pValue = pGlobalDescOp->pValue;
-				pGlobalDesc->usCap += (i + pGlobalDescOp->usCap);
-				p->usCap += i;
+				pGlobalDesc->nCap += (i + pGlobalDescOp->nCap);
+				p->nCap += i;
 			}
 			else
 			{
 				throw ex_wrongType;
 			}
-			usLength = newLength;
+			nLength = newLength;
 		}
 		else
 		{
@@ -170,15 +189,13 @@ struct Variant
 		{
 			unsigned short usNull;
 			unsigned short usType;
-			unsigned short usLength;
-			unsigned short usRef;
+			unsigned int nLength;
 		};
 
 		struct
 		{
-			unsigned short usCap;
-			unsigned short usReplaced;
-			unsigned int null;
+			unsigned int nCap;
+			unsigned int rc;
 		};
 	};
 
@@ -192,20 +209,23 @@ struct Bucket
 	Variant next;
 };
 
-const unsigned short c_primes[] = { 3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353,
-	431, 521, 631, 761, 919, 1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
-	17519, 21023, 25229, 30293, 36353, 43627, 52361, 62851 };
+const unsigned int c_primes[] = {
+			3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919,
+			1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
+			17519, 21023, 25229, 30293, 36353, 43627, 52361, 62851, 75431, 90523, 108631, 130363, 156437,
+			187751, 225307, 270371, 324449, 389357, 467237, 560689, 672827, 807403, 968897, 1162687, 1395263,
+			1674319, 2009191, 2411033, 2893249, 3471899, 4166287, 4999559, 5999471, 7199369 };
 
-inline const unsigned short GetPrime(const unsigned short num) noexcept
+inline const unsigned int GetPrime(const unsigned int num) noexcept
 {
-	for (int i = 0; i < 42; ++i)
+	for (int i = 0; i < 72; ++i)
 	{
-		const unsigned short prime = *(c_primes + i);
+		const unsigned int prime = *(c_primes + i);
 		if (prime > num)
 		{
 			return prime;
 		}
 	}
 
-	return USHRT_MAX;
+	return UINT_MAX;
 }

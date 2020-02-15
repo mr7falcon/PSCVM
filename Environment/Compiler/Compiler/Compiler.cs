@@ -133,12 +133,11 @@ namespace Compiler
 
                 ushort usNull = c_null;
                 ushort usType = (ushort)VarType.STR;
-                ushort usLength = (ushort)op.Length;
+                uint usLength = (uint)op.Length;
                 List<byte> bytes = new List<byte>();
                 bytes.AddRange(BitConverter.GetBytes(usNull));
                 bytes.AddRange(BitConverter.GetBytes(usType));
                 bytes.AddRange(BitConverter.GetBytes(usLength));
-                bytes.AddRange(BitConverter.GetBytes((ushort)1));
                 bytes.AddRange(Encoding.ASCII.GetBytes(op));
                 bts = bytes.ToArray();
             }
@@ -169,12 +168,11 @@ namespace Compiler
                 }
 
                 ushort usNull = c_null;
-                ushort usLength = usType == (ushort)VarType.ARR ? (ushort)varBytes.Count : (ushort)(varBytes.Count / 2);
+                uint usLength = usType == (ushort)VarType.ARR ? (uint)varBytes.Count : (uint)(varBytes.Count / 2);
                 List<byte> bytes = new List<byte>();
                 bytes.AddRange(BitConverter.GetBytes(usNull));
                 bytes.AddRange(BitConverter.GetBytes(usType));
                 bytes.AddRange(BitConverter.GetBytes(usLength));
-                bytes.AddRange(BitConverter.GetBytes((ushort)1));
 
                 for (int j = 0; j < varBytes.Count; ++j)
                 {
@@ -191,7 +189,7 @@ namespace Compiler
                     List<byte> bytes = new List<byte>();
                     bytes.AddRange(BitConverter.GetBytes(c_null));
                     bytes.AddRange(BitConverter.GetBytes((ushort)0));
-                    bytes.AddRange(BitConverter.GetBytes((int)0));
+                    bytes.AddRange(BitConverter.GetBytes((uint)0));
                     bts = bytes.ToArray();
                 }
                 else

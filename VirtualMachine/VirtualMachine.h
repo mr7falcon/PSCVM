@@ -67,12 +67,12 @@ public:
 	static inline void Initialize();
 	static inline void ShutDown();
 
-	static inline Variant* HeapAlloc(const unsigned short count, bool local = false)
+	static inline Variant* HeapAlloc(const unsigned int count, bool local = false)
 	{
 		Variant* pGlobalDesc = m_pCurrentSlot;
 		Variant* pLocalDesc = pGlobalDesc;
-		short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - pGlobalDesc - 1);
-		unsigned short nCountRemain = count;
+		short nChunkRemain = (short)(m_pCurrentChunk->vData + c_nChunkSize - pGlobalDesc - 1);
+		unsigned int nCountRemain = count;
 
 		if (!local)
 		{
@@ -98,7 +98,7 @@ public:
 			nChunkRemain = c_nChunkCapacity;
 		}
 
-		if (count < nChunkRemain)
+		if (count < (unsigned short)nChunkRemain)
 		{
 			*pLocalDesc = Variant(count);
 			++nCountRemain;
@@ -110,7 +110,7 @@ public:
 		}
 		else
 		{
-			*pLocalDesc = Variant((unsigned short)nChunkRemain);
+			*pLocalDesc = Variant((unsigned int)nChunkRemain);
 			nCountRemain -= nChunkRemain;
 
 			if (local)
@@ -128,7 +128,7 @@ public:
 				m_pCurrentChunk = m_pCurrentChunk->pNext;
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
-				*pLocalDesc = Variant(c_nChunkCapacity);
+				*pLocalDesc = Variant((unsigned int)c_nChunkCapacity);
 
 #ifdef _DEBUG
 				++g_memVar;
@@ -165,13 +165,13 @@ public:
 		return pGlobalDesc;
 	}
 
-	static inline Variant* HeapAllocStructArr(const unsigned short count)
+	static inline Variant* HeapAllocStructArr(const unsigned int count)
 	{
 		const unsigned short size = 3;
 		Variant* pGlobalDesc = m_pCurrentSlot;
 		Variant* pLocalDesc = pGlobalDesc;
-		short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - pGlobalDesc - 1) / size;
-		unsigned short nCountRemain = count;
+		short nChunkRemain = (short)(m_pCurrentChunk->vData + c_nChunkSize - pGlobalDesc - 1) / size;
+		unsigned int nCountRemain = count;
 
 		if (nChunkRemain <= 0)
 		{
@@ -187,14 +187,14 @@ public:
 			pGlobalDesc = pLocalDesc;
 		}
 
-		if (count < nChunkRemain)
+		if (count < (unsigned short)nChunkRemain)
 		{
 			*pLocalDesc = Variant(count);
 			nCountRemain = nCountRemain * size + 1;
 		}
 		else
 		{
-			*pLocalDesc = Variant((const unsigned short)nChunkRemain);
+			*pLocalDesc = Variant((const unsigned int)nChunkRemain);
 			nCountRemain -= nChunkRemain;
 
 			for (; nCountRemain >= c_nChunkSizeStruct; nCountRemain -= c_nChunkSizeStruct)
@@ -203,7 +203,7 @@ public:
 				m_pCurrentChunk = m_pCurrentChunk->pNext;
 				pLocalDesc->pValue = m_pCurrentChunk->vData;
 				pLocalDesc = m_pCurrentChunk->vData;
-				*pLocalDesc = Variant(c_nChunkSizeStruct);
+				*pLocalDesc = Variant((unsigned int)c_nChunkSizeStruct);
 
 #ifdef _DEBUG
 				++g_memVar;
@@ -367,7 +367,7 @@ inline void StrRun(byte* program, char* res)
 	VirtualMachine::Initialize();
 	VirtualMachine::Run(program);
 	Variant var = VirtualMachine::Return();
-	memcpy(res, var.pValue, var.usLength);
-	*(res + var.usLength) = '\0';
+	memcpy(res, var.pValue, var.nLength);
+	*(res + var.nLength) = '\0';
 	VirtualMachine::ShutDown();
 }

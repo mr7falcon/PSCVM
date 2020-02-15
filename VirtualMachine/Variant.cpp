@@ -23,7 +23,7 @@ const string Variant::ToString() const
 	else if (usType == VarType::STR)
 	{
 		string str = "\'";
-		str.append((char*)pValue, usLength);
+		str.append((char*)pValue, nLength);
 		str += '\'';
 		return str;
 	}
@@ -34,21 +34,21 @@ const string Variant::ToString() const
 		Variant* pGlobalDesc = (Variant*)pValue;
 		Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
 		Variant* pArr = pLocalDesc + 1;
-		Variant* stop = pArr + pLocalDesc->usCap;
+		Variant* stop = pArr + pLocalDesc->nCap;
 
 		if (usType == VarType::ARR)
 		{
-			const unsigned short length = usLength - 1;
+			const unsigned int length = nLength - 1;
 
 			str += (pArr++)->ToString();
 
-			for (unsigned short i = 0; i < length; ++i)
+			for (unsigned int i = 0; i < length; ++i)
 			{
 				if (pArr == stop)
 				{
 					pLocalDesc = (Variant*)pLocalDesc->pValue;
 					pArr = pLocalDesc + 1;
-					stop = pArr + pLocalDesc->usCap;
+					stop = pArr + pLocalDesc->nCap;
 				}
 
 				str = str + " | " + pArr->ToString();
@@ -60,11 +60,11 @@ const string Variant::ToString() const
 		}
 		else if (usType == VarType::DICT)
 		{
-			unsigned short length = usLength;
+			unsigned int length = nLength;
 			Bucket* bucket;
 			while (true)
 			{
-				const unsigned short capacity = pLocalDesc->usCap;
+				const unsigned int capacity = pLocalDesc->nCap;
 
 				for (; pArr <= stop; ++pArr)
 				{
@@ -90,7 +90,7 @@ const string Variant::ToString() const
 
 				pLocalDesc = (Variant*)pLocalDesc->pValue;
 				pArr = pLocalDesc + 1;
-				stop = pArr + pLocalDesc->usCap;
+				stop = pArr + pLocalDesc->nCap;
 			}
 		}
 	}
@@ -105,23 +105,25 @@ Variant Variant::FromBytes(byte** pc)
 
 	if (var.usNull == c_null)
 	{
-		const unsigned short length = var.usLength;
+		const unsigned int length = var.nLength;
 		if (var.usType == VarType::STR)
 		{
-			char* str = new char[length];
+			char* str = new char[length + sizeof(unsigned int)];
+			*((unsigned int*)str) = 1;
+			str += sizeof(unsigned int);
 			memcpy(str, *pc, length);
 			*pc += length;
 			var.pValue = str;
 		}
 		else if (var.usType == VarType::ARR)
 		{
-			unsigned short length = var.usLength;
+			unsigned int length = var.nLength;
 			Variant* pArr = VirtualMachine::HeapAlloc(length);
 			Variant* pLocalDesc = (Variant*)pArr->pValue;
 
 			while (pLocalDesc->pValue)
 			{
-				const unsigned short capacity = pLocalDesc->usCap;
+				const unsigned int capacity = pLocalDesc->nCap;
 				const Variant* pStop = pLocalDesc + capacity;
 				for (Variant* p = pLocalDesc + 1; p <= pStop; ++p)
 				{
@@ -141,20 +143,20 @@ Variant Variant::FromBytes(byte** pc)
 		}
 		else if (var.usType == VarType::DICT)
 		{
-			const unsigned short length = var.usLength;
-			const unsigned short cap = GetPrime(length);
+			const unsigned int length = var.nLength;
+			const unsigned int cap = GetPrime(length);
 			Variant* pGlobalDesc = VirtualMachine::HeapAlloc(cap);
 			var.pValue = pGlobalDesc;
 			Variant* pBucketDesc = VirtualMachine::HeapAllocStructArr(length);
 
 			while (pBucketDesc)
 			{
-				const unsigned short bucketCap = pBucketDesc->usCap;
+				const unsigned int bucketCap = pBucketDesc->nCap;
 				Bucket* pBucketArr = (Bucket*)(pBucketDesc + 1);
 				for (Bucket* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; ++pBucket)
 				{
 					Variant key = Variant::FromBytes(pc);
-					const unsigned short index = key.GetHash() % cap;
+					const unsigned int index = key.GetHash() % cap;
 
 					Variant* cell = var.Get(index);
 					pBucket->key = key;
@@ -204,14 +206,14 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			return false;
 		}
 
-		if (op1->usLength != op2->usLength)
+		if (op1->nLength != op2->nLength)
 		{
 			return false;
 		}
 
 		if (type == VarType::STR)
 		{
-			for (unsigned short i = 0; i < op1->usLength; ++i)
+			for (unsigned int i = 0; i < op1->nLength; ++i)
 			{
 				if (*((char*)pValue1 + i) != *((char*)pValue2 + i))
 				{
@@ -229,25 +231,25 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
 			Variant* pArr1 = pLocalDesc1 + 1;
 			Variant* pArr2 = pLocalDesc2 + 1;
-			Variant* stop1 = pArr1 + pLocalDesc1->usCap;
-			Variant* stop2 = pArr2 + pLocalDesc2->usCap;
+			Variant* stop1 = pArr1 + pLocalDesc1->nCap;
+			Variant* stop2 = pArr2 + pLocalDesc2->nCap;
 
 			if (type == VarType::ARR)
 			{
-				for (unsigned short i = 0; i < op1->usLength; ++i)
+				for (unsigned int i = 0; i < op1->nLength; ++i)
 				{
 					if (pArr1 == stop1)
 					{
 						pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
 						pArr1 = pLocalDesc1 + 1;
-						stop1 = pArr1 + pLocalDesc1->usCap;
+						stop1 = pArr1 + pLocalDesc1->nCap;
 					}
 
 					if (pArr2 == stop2)
 					{
 						pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
 						pArr2 = pLocalDesc2 + 1;
-						stop2 = pArr2 + pLocalDesc2->usCap;
+						stop2 = pArr2 + pLocalDesc2->nCap;
 					}
 
 					if (!Equal(pArr1, pArr2))
@@ -264,7 +266,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 				Bucket* bucket1 = nullptr;
 				Bucket* bucket2 = nullptr;
 
-				for (unsigned short i = 0; i < op1->usLength; ++i)
+				for (unsigned int i = 0; i < op1->nLength; ++i)
 				{
 					while (!bucket1)
 					{
@@ -272,7 +274,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 						{
 							pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
 							pArr1 = pLocalDesc1 + 1;
-							stop1 = pArr1 + pLocalDesc1->usCap;
+							stop1 = pArr1 + pLocalDesc1->nCap;
 						}
 
 						if (pArr1->pValue)
@@ -291,7 +293,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 						{
 							pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
 							pArr2 = pLocalDesc2 + 1;
-							stop2 = pArr2 + pLocalDesc2->usCap;
+							stop2 = pArr2 + pLocalDesc2->nCap;
 						}
 
 						if (pArr2->lValue > 0)
@@ -326,10 +328,10 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 void Variant::PushBack(Variant* var)
 {
 	Variant* pGlobalDesc = (Variant*)pValue;
-	unsigned short cap = pGlobalDesc->usCap;
-	if (usLength == cap)
+	unsigned int cap = pGlobalDesc->nCap;
+	if (nLength == cap)
 	{
-		const unsigned short inc = cap >> c_capInc;
+		const int short inc = cap >> c_capInc;
 		Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc, true);
 		*(pLocalDesc + 1) = *var;
 
@@ -339,30 +341,30 @@ void Variant::PushBack(Variant* var)
 			p = (Variant*)p->pValue;
 		}
 		p->pValue = pLocalDesc;
-		pGlobalDesc->usCap += inc;
+		pGlobalDesc->nCap += inc;
 	}
 	else
 	{
 		Variant* p = (Variant*)pGlobalDesc->pValue;
-		cap = p->usCap;
-		unsigned short length = usLength;
+		cap = p->nCap;
+		unsigned int length = nLength;
 		while (length > cap)
 		{
 			length -= cap;
 			p = (Variant*)p->pValue;
-			cap = p->usCap;
+			cap = p->nCap;
 		}
 
 		*(p + 1 + length) = *var;
 	}
 
-	++usLength;
+	++nLength;
 }
 
 void Variant::Insert(Variant* key, Variant* val)
 {
-	const unsigned short capacity = ((Variant*)pValue)->usCap;
-	unsigned short index = key->GetHash() % capacity;
+	const unsigned int capacity = ((Variant*)pValue)->nCap;
+	unsigned int index = key->GetHash() % capacity;
 
 	Variant* entry = (Variant*)Get(index);
 	//if entry->lValue more then trashhold constante, hash would be resized
@@ -383,13 +385,13 @@ void Variant::Insert(Variant* key, Variant* val)
 		entry->pValue = bucket;
 	}
 
-	++usLength;
+	++nLength;
 }
 
 Variant* Variant::Find(Variant* key) const
 {
-	const unsigned short capacity = ((Variant*)pValue)->usCap;
-	unsigned short index = key->GetHash() % capacity;
+	const unsigned int capacity = ((Variant*)pValue)->nCap;
+	unsigned int index = key->GetHash() % capacity;
 
 	Bucket* bucket = (Bucket*)Get(index)->pValue;
 
@@ -408,8 +410,8 @@ Variant* Variant::Find(Variant* key) const
 
 void Variant::Erase(Variant* key)
 {
-	const unsigned short cap = ((Variant*)pValue)->usCap;
-	unsigned short index = key->GetHash() % cap;
+	const unsigned int cap = ((Variant*)pValue)->nCap;
+	unsigned int index = key->GetHash() % cap;
 	Variant* pEntry = Get(index);
 	Variant* prev = pEntry;
 	Bucket* pBucket = (Bucket*)pEntry->pValue;
@@ -418,8 +420,8 @@ void Variant::Erase(Variant* key)
 	{
 		if (Equal(key, &pBucket->key))
 		{
-			--usLength;
-			--pEntry->usCap;
+			--nLength;
+			--pEntry->nCap;
 			pBucket = (Bucket*)pBucket->next.pValue;
 			prev->pValue = pBucket;
 			return;
@@ -436,13 +438,13 @@ Variant Variant::Duplicate()
 	if (usNull == c_null && usType == VarType::ARR)
 	{
 		Variant* pGlobalDesc1 = (Variant*)pValue;
-		Variant* pGlobalDesc2 = VirtualMachine::HeapAlloc(pGlobalDesc1->usCap);
+		Variant* pGlobalDesc2 = VirtualMachine::HeapAlloc(pGlobalDesc1->nCap);
 		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
 		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
 		Variant* pArr1 = pLocalDesc1 + 1;
 		Variant* pArr2 = pLocalDesc2 + 1;
-		unsigned short stop1 = pLocalDesc1->usCap;
-		unsigned short stop2 = pLocalDesc2->usCap;
+		unsigned int stop1 = pLocalDesc1->nCap;
+		unsigned int stop2 = pLocalDesc2->nCap;
 
 		if (usType == VarType::ARR)
 		{
@@ -460,7 +462,7 @@ Variant Variant::Duplicate()
 					}
 
 					pArr2 += stop1;
-					stop1 = pLocalDesc1->usCap;
+					stop1 = pLocalDesc1->nCap;
 					pArr1 = pLocalDesc1 + 1;
 				}
 				else
@@ -475,12 +477,12 @@ Variant Variant::Duplicate()
 					}
 
 					pArr1 += stop2;
-					stop2 = pLocalDesc2->usCap;
+					stop2 = pLocalDesc2->nCap;
 					pArr2 = pLocalDesc2 + 1;
 				}
 			}
 
-			Variant var = Variant(pGlobalDesc2, usLength, VarType::ARR);
+			Variant var = Variant(pGlobalDesc2, nLength, VarType::ARR);
 			Free();
 			return var;
 		}
@@ -499,7 +501,7 @@ const unsigned long Variant::GetHash() const
 		{
 			static const unsigned short p = 73;
 			unsigned long p_pow = p;
-			const char* pStop = (char*)pValue + usLength;
+			const char* pStop = (char*)pValue + nLength;
 			for (char* str = (char*)pValue; str < pStop; ++str)
 			{
 				hash += (unsigned long)(*str * p_pow);
@@ -511,17 +513,17 @@ const unsigned long Variant::GetHash() const
 			Variant* pGlobalDesc = (Variant*)pValue;
 			Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
 			Variant* pArr = pLocalDesc + 1;
-			Variant* stop = pArr + pLocalDesc->usCap;
+			Variant* stop = pArr + pLocalDesc->nCap;
 
 			if (usType == VarType::ARR)
 			{
-				for (unsigned short i = 0; i < usLength; ++i)
+				for (unsigned int i = 0; i < nLength; ++i)
 				{
 					if (pArr == stop)
 					{
 						pLocalDesc = (Variant*)pLocalDesc->pValue;
 						pArr = pLocalDesc + 1;
-						stop = pArr + pLocalDesc->usCap;
+						stop = pArr + pLocalDesc->nCap;
 					}
 
 					hash ^= pArr->GetHash();
@@ -530,11 +532,11 @@ const unsigned long Variant::GetHash() const
 			}
 			else if (usType == VarType::DICT)
 			{
-				unsigned short length = usLength;
+				unsigned int length = nLength;
 				Bucket* bucket;
 				while (true)
 				{
-					const unsigned short capacity = pLocalDesc->usCap;
+					const unsigned int capacity = pLocalDesc->nCap;
 
 					for (; pArr <= stop; ++pArr)
 					{
@@ -555,7 +557,7 @@ const unsigned long Variant::GetHash() const
 
 					pLocalDesc = (Variant*)pLocalDesc->pValue;
 					pArr = pLocalDesc + 1;
-					stop = pArr + pLocalDesc->usCap;
+					stop = pArr + pLocalDesc->nCap;
 				}
 			}
 		}
