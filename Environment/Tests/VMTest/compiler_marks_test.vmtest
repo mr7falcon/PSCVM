@@ -1,9 +1,0 @@
-JMP mark1
-FETCH 100
-mark1:
-CALL mark2
-HALT
-mark2:
-PUSH 'DONE'
-PRINT
-RET

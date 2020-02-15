@@ -1,0 +1,6 @@
+CALL mark
+HALT
+mark:
+PUSH 'DONE'
+PRINT
+HALT

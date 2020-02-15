@@ -3,6 +3,7 @@
 #include <iostream>
 
 const exception VirtualMachine::ex_argDoesntExists = exception("Argument does not exists");
+const exception VirtualMachine::ex_zeroDiv = exception("Division by zero");
 Variant* VirtualMachine::m_pStack;
 VirtualMachine::HeapChunk* VirtualMachine::m_pFirstChunk;
 VirtualMachine::HeapChunk* VirtualMachine::m_pCurrentChunk;
@@ -43,7 +44,7 @@ void VirtualMachine::ShutDown()
 {
 	for (Variant* iter = m_pStack; iter < m_pStack + m_nCapacity; ++iter)
 	{
-		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
+		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR && iter->pValue)
 		{
 			delete[]((char*)iter->pValue);
 			iter->pValue = nullptr;
@@ -281,7 +282,7 @@ void VirtualMachine::Run(byte* program)
 			Log("CALL " + std::to_string(mark));
 #endif
 
-			if (m_bp + 2 >= m_sp)
+			if (m_bp + 1 == m_sp)
 			{
 				Resize();
 			}
@@ -758,7 +759,7 @@ void VirtualMachine::Run(byte* program)
 			}
 			else
 			{
-				op1->usNull = Variant::c_null;
+				throw ex_zeroDiv;
 			}
 		}
 		break;
@@ -780,7 +781,7 @@ void VirtualMachine::Run(byte* program)
 			}
 			else
 			{
-				op1->usNull = Variant::c_null;
+				throw ex_zeroDiv;
 			}
 		}
 		break;

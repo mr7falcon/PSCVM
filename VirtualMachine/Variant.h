@@ -100,7 +100,7 @@ struct Variant
 
 	void Insert(Variant* key, Variant* val);	//same as PushBack
 
-	const long GetHash() const;
+	const unsigned long GetHash() const;
 
 	inline void PopBack() noexcept
 	{

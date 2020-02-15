@@ -62,6 +62,7 @@ class VirtualMachine
 {
 public:
 	static const exception ex_argDoesntExists;
+	static const exception ex_zeroDiv;
 
 	static inline void Initialize();
 	static inline void ShutDown();

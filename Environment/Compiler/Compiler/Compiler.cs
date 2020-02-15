@@ -116,7 +116,17 @@ namespace Compiler
 
             ClearSpaces();
 
-            if (program[i] == '\'' || program[i] == '\"')
+            if (Char.IsDigit(program[i]))
+            {
+                string op = "";
+                op += program[i++];
+                while (Char.IsDigit(program[i]) || program[i] == ',')
+                {
+                    op += program[i++];
+                }
+                bts = BitConverter.GetBytes(double.Parse(op));
+            }
+            else if (program[i] == '\'' || program[i] == '\"')
             {
                 ++i;
                 string op = Split('\'', '\"');
@@ -175,12 +185,19 @@ namespace Compiler
             }
             else
             {
-                string op = "";
-                while (Char.IsDigit(program[i]) || program[i] == ',' || program[i] == '-')
+                string op = Split();
+                if (op == "NULL")
                 {
-                    op += program[i++];
+                    List<byte> bytes = new List<byte>();
+                    bytes.AddRange(BitConverter.GetBytes(c_null));
+                    bytes.AddRange(BitConverter.GetBytes((ushort)0));
+                    bytes.AddRange(BitConverter.GetBytes((int)0));
+                    bts = bytes.ToArray();
                 }
-                bts = BitConverter.GetBytes(double.Parse(op));
+                else
+                {
+                    throw new Exception("unexpected symbol");
+                }
             }
 
             if (cont != null)

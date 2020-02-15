@@ -1,0 +1,9 @@
+CALL mark
+PUSH 'RET'
+PRINT
+HALT
+mark:
+PUSH 'CALL'
+PRINT
+RET
+HALT

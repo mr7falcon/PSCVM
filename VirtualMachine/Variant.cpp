@@ -489,20 +489,20 @@ Variant Variant::Duplicate()
 	return *this;
 }
 
-const long Variant::GetHash() const
+const unsigned long Variant::GetHash() const
 {
-	long hash = 0;
+	unsigned long hash = 0;
 
 	if (usNull == c_null)
 	{
 		if (usType == VarType::STR)
 		{
 			static const unsigned short p = 73;
-			long long p_pow = p;
+			unsigned long p_pow = p;
 			const char* pStop = (char*)pValue + usLength;
 			for (char* str = (char*)pValue; str < pStop; ++str)
 			{
-				hash += (long)(*str * p_pow);
+				hash += (unsigned long)(*str * p_pow);
 				p_pow *= p;
 			}
 		}
