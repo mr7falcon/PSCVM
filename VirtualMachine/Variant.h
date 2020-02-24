@@ -19,10 +19,37 @@ enum VarType : unsigned short
 
 struct Variant
 {
-	static const exception ex_keyMissing;
-	static const exception ex_typeMismatch;
-	static const exception ex_wrongType;
-	static const exception ex_outOfBounds;
+	class ex_keyMissing : exception
+	{
+	public:
+		ex_keyMissing(Variant* key)
+			: exception(("key is missing " + key->ToString() + "\n").c_str())
+		{}
+	};
+
+	class ex_typeMismatch : exception
+	{
+	public:
+		ex_typeMismatch(VarType type1, VarType type2)
+			: exception(("type mismatch " + TypeToString(type1) + " : " + TypeToString(type2) + "\n").c_str())
+		{}
+	};
+
+	class ex_wrongType : exception
+	{
+	public:
+		ex_wrongType(VarType type)
+			: exception(("operation can't be used with this type " + TypeToString(type) + "\n").c_str())
+		{}
+	};
+
+	class ex_outOfBounds : exception
+	{
+	public:
+		ex_outOfBounds(const unsigned int i)
+			: exception(("index is out of bounds " + std::to_string(i) + "\n").c_str())
+		{}
+	};
 
 	static const unsigned short c_null = 0x7FF0;
 	static const char c_capInc = 2;
@@ -118,7 +145,7 @@ struct Variant
 		{
 			if (usType != op->usType)
 			{
-				throw ex_typeMismatch;
+				throw ex_typeMismatch((VarType)usType, (VarType)op->usType);
 			}
 
 			const unsigned int len = op->nLength;
@@ -151,13 +178,13 @@ struct Variant
 			}
 			else
 			{
-				throw ex_wrongType;
+				throw ex_wrongType((VarType)usType);
 			}
 			nLength = newLength;
 		}
 		else
 		{
-			throw ex_wrongType;
+			throw ex_wrongType((VarType)usType);
 		}
 	}
 
@@ -166,6 +193,27 @@ struct Variant
 
 	const string ToString() const;
 	static Variant FromBytes(byte** pc);
+
+	inline static string TypeToString(VarType type)
+	{
+		switch (type)
+		{
+		case VarType::STR:
+			return "string";
+			break;
+		case VarType::ARR:
+			return "array";
+			break;
+		case VarType::DICT:
+			return "dictionary";
+			break;
+		case VarType::NIL:
+			return "null";
+			break;
+		default:
+			return "number";
+		}
+	}
 
 	union
 	{

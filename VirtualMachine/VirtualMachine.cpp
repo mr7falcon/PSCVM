@@ -2,8 +2,6 @@
 #include <cstring>
 #include <iostream>
 
-const exception VirtualMachine::ex_argDoesntExists = exception("Argument does not exists");
-const exception VirtualMachine::ex_zeroDiv = exception("Division by zero");
 Variant* VirtualMachine::m_pStack;
 VirtualMachine::HeapChunk* VirtualMachine::m_pFirstChunk;
 VirtualMachine::HeapChunk* VirtualMachine::m_pCurrentChunk;
@@ -285,834 +283,841 @@ void VirtualMachine::Run(byte* program)
 {
 	byte* pc = program;
 
-	while (true)
+	try
 	{
-		switch ((ByteCommand) * (pc++))
+		while (true)
 		{
-		case ByteCommand::CALL:
-		{
-			const int mark = *((long*)pc);
-			pc += sizeof(long long);
-
-#ifdef _DEBUG
-			Log("CALL " + std::to_string(mark));
-#endif
-
-			if (m_bp + 1 == m_sp)
+			switch ((ByteCommand) * (pc++))
 			{
-				Resize();
-			}
-			(++m_bp)->lValue = (long)(pc - program);
-			pc = program + mark;
-		}
-		break;
-		case ByteCommand::RET:
-		{
-#ifdef _DEBUG
-			Log("RET");
-#endif
-
-			pc = program + (long)(m_bp--)->lValue;
-		}
-		break;
-		case ByteCommand::FETCH:
-		{
-			if (m_sp - 1 == m_bp)
+			case ByteCommand::CALL:
 			{
-				Resize();
+				const int mark = *((long*)pc);
+				pc += sizeof(long long);
+
+#ifdef _DEBUG
+				Log("CALL " + std::to_string(mark));
+#endif
+
+				if (m_bp + 1 == m_sp)
+				{
+					Resize();
+				}
+				(++m_bp)->lValue = (long)(pc - program);
+				pc = program + mark;
 			}
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("FETCH " + std::to_string(offset));
-#endif
-
-			* (--m_sp) = *(m_pStack + m_nCapacity - offset);
-			m_sp->Copy();
-		}
-		break;
-		case ByteCommand::STORE:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("STORE " + m_sp->ToString() + " " + std::to_string(offset));
-#endif
-
-			* (m_pStack + m_nCapacity - offset) = *(m_sp++);
-		}
-		break;
-		case ByteCommand::LFETCH:
-		{
-			if (m_sp - 1 == m_bp)
+			break;
+			case ByteCommand::RET:
 			{
-				Resize();
+#ifdef _DEBUG
+				Log("RET");
+#endif
+
+				pc = program + (long)(m_bp--)->lValue;
 			}
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("LFETCH " + std::to_string(offset));
-#endif
-
-			* (--m_sp) = *(m_bp - offset);
-			m_sp->Copy();
-		}
-		break;
-		case ByteCommand::LSTORE:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("LSTORE " + m_sp->ToString() + " " + std::to_string(offset));
-#endif
-
-			* (m_bp - offset) = *(m_sp++);
-		}
-		break;
-		case ByteCommand::AFETCH:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-			if (m_sp->usNull == Variant::c_null)
+			break;
+			case ByteCommand::FETCH:
 			{
-				throw Variant::ex_wrongType;
-			}
-
-			const unsigned int index = (unsigned int)m_sp->dValue;
+				if (m_sp - 1 == m_bp)
+				{
+					Resize();
+				}
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			Log("AFETCH " + std::to_string(offset) + " " + std::to_string(index));
-
-			const clock_t tStart = clock();
+				Log("FETCH " + std::to_string(offset));
 #endif
 
-			Variant* arr = m_pStack + m_nCapacity - offset;
-			if (index >= arr->nLength)
+				* (--m_sp) = *(m_pStack + m_nCapacity - offset);
+				m_sp->Copy();
+			}
+			break;
+			case ByteCommand::STORE:
 			{
-				throw Variant::ex_outOfBounds;
-			}
-			Variant* var = arr->Get(index);
-			var->Copy();
-			*m_sp = *var;
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
+				Log("STORE " + m_sp->ToString() + " " + std::to_string(offset));
 #endif
-		}
-		break;
-		case ByteCommand::ASTORE:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
 
-			if (m_sp->usNull == Variant::c_null)
+				* (m_pStack + m_nCapacity - offset) = *(m_sp++);
+			}
+			break;
+			case ByteCommand::LFETCH:
 			{
-				throw Variant::ex_wrongType;
-			}
-
-			const unsigned int index = (unsigned int)(m_sp++)->dValue;
+				if (m_sp - 1 == m_bp)
+				{
+					Resize();
+				}
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			Log("ASTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
-
-			const clock_t tStart = clock();
+				Log("LFETCH " + std::to_string(offset));
 #endif
 
-			Variant* arr = m_pStack + m_nCapacity - offset;
-			if (index >= arr->nLength)
+				* (--m_sp) = *(m_bp - offset);
+				m_sp->Copy();
+			}
+			break;
+			case ByteCommand::LSTORE:
 			{
-				throw Variant::ex_outOfBounds;
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
+
+#ifdef _DEBUG
+				Log("LSTORE " + m_sp->ToString() + " " + std::to_string(offset));
+#endif
+
+				* (m_bp - offset) = *(m_sp++);
 			}
-			*(arr->Get(index)) = *(m_sp++);
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::APUSH:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("APUSH " + m_sp->ToString() + " " + std::to_string(offset));
-
-			const clock_t tStart = clock();
-#endif
-
-			(m_pStack + m_nCapacity - offset)->PushBack(m_sp++);
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::DFETCH:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("DFETCH " + std::to_string(offset) + " " + m_sp->ToString());
-
-			const clock_t tStart = clock();
-#endif
-
-			Variant* val = (m_pStack + m_nCapacity - offset)->Find(m_sp);
-			val->Copy();
-			m_sp->Free();
-			*m_sp = *val;
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::DSTORE:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-			Variant* key = m_sp++;
-
-#ifdef _DEBUG
-			Log("DSTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
-
-			const clock_t tStart = clock();
-#endif
-
-			* ((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
-			key->Free();
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::DINSERT:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-			Variant* key = m_sp++;
-
-#ifdef _DEBUG
-			Log("DINS " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
-
-			const clock_t tStart = clock();
-#endif
-
-			(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++);
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::LALLOC:
-		{
-			const int size = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("LALLOC " + std::to_string(size));
-#endif
-
-			while (m_bp + size + 1 >= m_sp)
+			break;
+			case ByteCommand::AFETCH:
 			{
-				Resize();
-			}
-			m_bp = m_bp + size + 1;
-			m_bp->dValue = size;
-		}
-		break;
-		case ByteCommand::LFREE:
-		{
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
+
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+
+				const unsigned int index = (unsigned int)m_sp->dValue;
+
 #ifdef _DEBUG
-			Log("LFREE");
+				Log("AFETCH " + std::to_string(offset) + " " + std::to_string(index));
+
+				const clock_t tStart = clock();
 #endif
 
-			Variant* bp = m_bp - 1 - (int)(m_bp--)->dValue;
-			while (m_bp > bp)
+				Variant* arr = m_pStack + m_nCapacity - offset;
+				if (index >= arr->nLength)
+				{
+					throw Variant::ex_outOfBounds(index);
+				}
+				Variant* var = arr->Get(index);
+				var->Copy();
+				*m_sp = *var;
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::ASTORE:
 			{
-				(m_bp--)->Free();
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
+
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+
+				const unsigned int index = (unsigned int)(m_sp++)->dValue;
+
+#ifdef _DEBUG
+				Log("ASTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
+
+				const clock_t tStart = clock();
+#endif
+
+				Variant* arr = m_pStack + m_nCapacity - offset;
+				if (index >= arr->nLength)
+				{
+					throw Variant::ex_outOfBounds(index);
+				}
+				*(arr->Get(index)) = *(m_sp++);
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
 			}
-		}
-		break;
-		case ByteCommand::ARRAY:
-		{
-			if (m_sp->usNull == Variant::c_null)
+			break;
+			case ByteCommand::APUSH:
 			{
-				throw Variant::ex_wrongType;
-			}
-			
-			const unsigned int len = (unsigned short)m_sp->dValue;
-			
-#ifdef _DEBUG
-			Log("ARR " + std::to_string(len));
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
-			const clock_t tStart = clock();
+#ifdef _DEBUG
+				Log("APUSH " + m_sp->ToString() + " " + std::to_string(offset));
+
+				const clock_t tStart = clock();
 #endif
 
-			unsigned int capacity = len + (len >> Variant::c_capInc);
-			static const unsigned char minCapacity = 8;
-			if (capacity < minCapacity)
+				(m_pStack + m_nCapacity - offset)->PushBack(m_sp++);
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::DFETCH:
 			{
-				capacity = minCapacity;
-			}
-			Variant* arr = VirtualMachine::HeapAlloc(capacity);
-			*m_sp = Variant(arr, len, VarType::ARR);
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
+				Log("DFETCH " + std::to_string(offset) + " " + m_sp->ToString());
+
+				const clock_t tStart = clock();
 #endif
-		}
-		break;
-		case ByteCommand::DICTIONARY:
-		{
-			if (m_sp->usNull == Variant::c_null)
+
+				Variant* val = (m_pStack + m_nCapacity - offset)->Find(m_sp);
+				val->Copy();
+				m_sp->Free();
+				*m_sp = *val;
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::DSTORE:
 			{
-				throw Variant::ex_wrongType;
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
+
+				Variant* key = m_sp++;
+
+#ifdef _DEBUG
+				Log("DSTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+
+				const clock_t tStart = clock();
+#endif
+
+				* ((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
+				key->Free();
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
 			}
-			
-			const unsigned int len = (unsigned int)m_sp->dValue;
-			
-#ifdef _DEBUG
-			Log("DICT " + std::to_string(len));
-
-			const clock_t tStart = clock();
-#endif
-
-			const unsigned int capacity = GetPrime(len + (len >> Variant::c_capInc));
-			Variant* dict = VirtualMachine::HeapAlloc(capacity);
-			*m_sp = Variant(dict, 0, VarType::DICT);
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::CONCAT:
-		{
-			Variant* op2 = m_sp;
-			Variant* op1 = ++m_sp;
-
-#ifdef _DEBUG
-			Log("CONCAT " + op1->ToString() + " " + op2->ToString());
-
-			const clock_t tStart = clock();
-#endif
-
-			op1->Concat(op2);
-			op2->Free();
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::APOP:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("APOP " + std::to_string(offset));
-
-			const clock_t tStart = clock();
-#endif
-
-			(m_pStack + m_nCapacity - offset)->PopBack();
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::DERASE:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
-
-#ifdef _DEBUG
-			Log("DERASE " + std::to_string(offset) + " " + m_sp->ToString());
-
-			const clock_t tStart = clock();
-#endif
-
-			(m_pStack + m_nCapacity - offset)->Erase(m_sp);
-			(m_sp++)->Free();
-
-#ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
-#endif
-		}
-		break;
-		case ByteCommand::PUSH:
-		{
-			if (m_sp - 1 == m_bp)
+			break;
+			case ByteCommand::DINSERT:
 			{
-				Resize();
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
+
+				Variant* key = m_sp++;
+
+#ifdef _DEBUG
+				Log("DINS " + m_sp->ToString() + " " + std::to_string(offset) + " " + key->ToString());
+
+				const clock_t tStart = clock();
+#endif
+
+				(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++);
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
 			}
-			*(--m_sp) = Variant::FromBytes(&pc);
-
-#ifdef _DEBUG
-			Log("PUSH " + m_sp->ToString());
-#endif
-		}
-		break;
-		case ByteCommand::POP:
-		{
-#ifdef _DEBUG
-			Log("POP " + m_sp->ToString());
-#endif
-
-			(m_sp++)->Free();
-		}
-		break;
-		case ByteCommand::ADD:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
-
-#ifdef _DEBUG
-			Log("ADD " + op1->ToString() + " " + op2->ToString());
-#endif
-
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			break;
+			case ByteCommand::LALLOC:
 			{
-				throw Variant::ex_wrongType;
-			}
-			op1->dValue += op2->dValue;
-		}
-		break;
-		case ByteCommand::SUB:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				const int size = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			Log("SUB " + op1->ToString() + " " + op2->ToString());
+				Log("LALLOC " + std::to_string(size));
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
-			{
-				throw Variant::ex_wrongType;
+				while (m_bp + size + 1 >= m_sp)
+				{
+					Resize();
+				}
+				m_bp = m_bp + size + 1;
+				m_bp->dValue = size;
 			}
-			op1->dValue -= op2->dValue;
-		}
-		break;
-		case ByteCommand::INC:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
+			break;
+			case ByteCommand::LFREE:
+			{
+#ifdef _DEBUG
+				Log("LFREE");
+#endif
+
+				Variant* bp = m_bp - 1 - (int)(m_bp--)->dValue;
+				while (m_bp > bp)
+				{
+					(m_bp--)->Free();
+				}
+			}
+			break;
+			case ByteCommand::ARRAY:
+			{
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+
+				const unsigned int len = (unsigned short)m_sp->dValue;
 
 #ifdef _DEBUG
-			Log("INC " + std::to_string(offset));
+				Log("ARR " + std::to_string(len));
+
+				const clock_t tStart = clock();
 #endif
 
-			Variant* var = (m_pStack + m_nCapacity - offset);
-			if (var->usNull == Variant::c_null)
-			{
-				throw Variant::ex_wrongType;
-			}
-			++var->dValue;
-		}
-		break;
-		case ByteCommand::DEC:
-		{
-			const int offset = *((int*)pc);
-			pc += sizeof(int);
+				unsigned int capacity = len + (len >> Variant::c_capInc);
+				static const unsigned char minCapacity = 8;
+				if (capacity < minCapacity)
+				{
+					capacity = minCapacity;
+				}
+				Variant* arr = VirtualMachine::HeapAlloc(capacity);
+				*m_sp = Variant(arr, len, VarType::ARR);
 
 #ifdef _DEBUG
-			Log("DEC " + std::to_string(offset));
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
 #endif
-
-			Variant* var = (m_pStack + m_nCapacity - offset);
-			if (var->usNull == Variant::c_null)
-			{
-				throw Variant::ex_wrongType;
 			}
-			--var->dValue;
-		}
-		break;
-		case ByteCommand::MULT:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+			break;
+			case ByteCommand::DICTIONARY:
+			{
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+
+				const unsigned int len = (unsigned int)m_sp->dValue;
 
 #ifdef _DEBUG
-			Log("MULT " + op1->ToString() + " " + op2->ToString());
+				Log("DICT " + std::to_string(len));
+
+				const clock_t tStart = clock();
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
-			{
-				throw Variant::ex_wrongType;
-			}
-			op1->dValue *= op2->dValue;
-		}
-		break;
-		case ByteCommand::DIV:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				const unsigned int capacity = GetPrime(len + (len >> Variant::c_capInc));
+				Variant* dict = VirtualMachine::HeapAlloc(capacity);
+				*m_sp = Variant(dict, 0, VarType::DICT);
 
 #ifdef _DEBUG
-			Log("DIV " + op1->ToString() + " " + op2->ToString());
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
 #endif
-
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
-			{
-				throw Variant::ex_wrongType;
 			}
-
-			if (op2->dValue != 0.0)
+			break;
+			case ByteCommand::CONCAT:
 			{
-				op1->dValue /= op2->dValue;
-			}
-			else
-			{
-				throw ex_zeroDiv;
-			}
-		}
-		break;
-		case ByteCommand::MOD:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				Variant* op2 = m_sp;
+				Variant* op1 = ++m_sp;
 
 #ifdef _DEBUG
-			Log("MOD " + op1->ToString() + " " + op2->ToString());
+				Log("CONCAT " + op1->ToString() + " " + op2->ToString());
+
+				const clock_t tStart = clock();
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
-			{
-				throw Variant::ex_wrongType;
+				op1->Concat(op2);
+				op2->Free();
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
 			}
-
-			if (op2->dValue != 0.0)
+			break;
+			case ByteCommand::APOP:
 			{
-				op1->dValue = (int)op1->dValue % (int)op2->dValue;
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
+
+#ifdef _DEBUG
+				Log("APOP " + std::to_string(offset));
+
+				const clock_t tStart = clock();
+#endif
+
+				(m_pStack + m_nCapacity - offset)->PopBack();
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
 			}
-			else
+			break;
+			case ByteCommand::DERASE:
 			{
-				throw ex_zeroDiv;
-			}
-		}
-		break;
-		case ByteCommand::AND:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			Log("AND " + op1->ToString() + " " + op2->ToString());
+				Log("DERASE " + std::to_string(offset) + " " + m_sp->ToString());
+
+				const clock_t tStart = clock();
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				(m_pStack + m_nCapacity - offset)->Erase(m_sp);
+				(m_sp++)->Free();
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::PUSH:
 			{
-				throw Variant::ex_wrongType;
-			}
-			op1->dValue = (op1->dValue != 0.0 && op2->dValue != 0.0
-				&& op1->usNull != Variant::c_null && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
-		}
-		break;
-		case ByteCommand::OR:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				if (m_sp - 1 == m_bp)
+				{
+					Resize();
+				}
+				*(--m_sp) = Variant::FromBytes(&pc);
 
 #ifdef _DEBUG
-			Log("OR " + op1->ToString() + " " + op2->ToString());
+				Log("PUSH " + m_sp->ToString());
 #endif
-
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+			}
+			break;
+			case ByteCommand::POP:
 			{
-				throw Variant::ex_wrongType;
-			}
-			op1->dValue = (op1->dValue != 0.0 && op1->usNull != Variant::c_null
-				|| op2->dValue != 0.0 && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
-		}
-		break;
-		case ByteCommand::NOT:
-		{
 #ifdef _DEBUG
-			Log("NOT " + m_sp->ToString());
+				Log("POP " + m_sp->ToString());
 #endif
-			if (m_sp->usNull == Variant::c_null)
+
+				(m_sp++)->Free();
+			}
+			break;
+			case ByteCommand::ADD:
 			{
-				throw Variant::ex_wrongType;
-			}
-			m_sp->dValue = m_sp->dValue == 0.0 ? 1.0 : 0.0;
-		}
-		break;
-		case ByteCommand::LT:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
 
 #ifdef _DEBUG
-			Log("LT " + op1->ToString() + " " + op2->ToString());
+				Log("ADD " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue += op2->dValue;
+			}
+			break;
+			case ByteCommand::SUB:
 			{
-				throw Variant::ex_wrongType;
-			}
-			op1->dValue = op1->dValue < op2->dValue ? 1.0 : 0.0;
-		}
-		break;
-		case ByteCommand::GT:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
 
 #ifdef _DEBUG
-			Log("GT " + op1->ToString() + " " + op2->ToString());
+				Log("SUB " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue -= op2->dValue;
+			}
+			break;
+			case ByteCommand::INC:
 			{
-				throw Variant::ex_wrongType;
-			}
-			op1->dValue = op1->dValue > op2->dValue ? 1.0 : 0.0;
-		}
-		break;
-		case ByteCommand::LET:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			Log("LET " + op1->ToString() + " " + op2->ToString());
+				Log("INC " + std::to_string(offset));
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				Variant* var = (m_pStack + m_nCapacity - offset);
+				if (var->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)var->usType);
+				}
+				++var->dValue;
+			}
+			break;
+			case ByteCommand::DEC:
 			{
-				throw Variant::ex_wrongType;
-			}
-			op1->dValue = op1->dValue <= op2->dValue ? 1.0 : 0.0;
-		}
-		break;
-		case ByteCommand::GET:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+				const int offset = *((int*)pc);
+				pc += sizeof(int);
 
 #ifdef _DEBUG
-			Log("GET " + op1->ToString() + " " + op2->ToString());
+				Log("DEC " + std::to_string(offset));
 #endif
 
-			if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				Variant* var = (m_pStack + m_nCapacity - offset);
+				if (var->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)var->usType);
+				}
+				--var->dValue;
+			}
+			break;
+			case ByteCommand::MULT:
 			{
-				throw Variant::ex_wrongType;
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("MULT " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue *= op2->dValue;
 			}
-			op1->dValue = op1->dValue >= op2->dValue ? 1.0 : 0.0;
-		}
-		break;
-		case ByteCommand::EQ:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+			break;
+			case ByteCommand::DIV:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
 
 #ifdef _DEBUG
-			Log("EQ " + op1->ToString() + " " + op2->ToString());
-
-			const clock_t tStart = clock();
+				Log("DIV " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			const double bRes = Variant::Equal(op1, op2) ? 1.0 : 0.0;
-			op1->Free();
-			op2->Free();
-			op1->dValue = bRes;
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+
+				if (op2->dValue != 0.0)
+				{
+					op1->dValue /= op2->dValue;
+				}
+				else
+				{
+					throw ex_zeroDiv();
+				}
+			}
+			break;
+			case ByteCommand::MOD:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
 
 #ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
+				Log("MOD " + op1->ToString() + " " + op2->ToString());
 #endif
-		}
-		break;
-		case ByteCommand::NEQ:
-		{
-			Variant* op2 = m_sp++;
-			Variant* op1 = m_sp;
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+
+				if (op2->dValue != 0.0)
+				{
+					op1->dValue = (int)op1->dValue % (int)op2->dValue;
+				}
+				else
+				{
+					throw ex_zeroDiv();
+				}
+			}
+			break;
+			case ByteCommand::AND:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
 
 #ifdef _DEBUG
-			Log("NEQ " + op1->ToString() + " " + op2->ToString());
-
-			const clock_t tStart = clock();
+				Log("AND " + op1->ToString() + " " + op2->ToString());
 #endif
 
-			const double bRes = Variant::Equal(op1, op2) ? 0.0 : 1.0;
-			op1->Free();
-			op2->Free();
-			op1->dValue = bRes;
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = (op1->dValue != 0.0 && op2->dValue != 0.0
+					&& op1->usNull != Variant::c_null && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
+			}
+			break;
+			case ByteCommand::OR:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
 
 #ifdef _DEBUG
-			const clock_t tEnd = clock();
-			LogTime(tEnd - tStart);
+				Log("OR " + op1->ToString() + " " + op2->ToString());
 #endif
-		}
-		break;
-		case ByteCommand::JZ:
-		{
-			if ((m_sp++)->dValue == 0.0)
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = (op1->dValue != 0.0 && op1->usNull != Variant::c_null
+					|| op2->dValue != 0.0 && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
+			}
+			break;
+			case ByteCommand::NOT:
+			{
+#ifdef _DEBUG
+				Log("NOT " + m_sp->ToString());
+#endif
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+				m_sp->dValue = m_sp->dValue == 0.0 ? 1.0 : 0.0;
+			}
+			break;
+			case ByteCommand::LT:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("LT " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = op1->dValue < op2->dValue ? 1.0 : 0.0;
+			}
+			break;
+			case ByteCommand::GT:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("GT " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = op1->dValue > op2->dValue ? 1.0 : 0.0;
+			}
+			break;
+			case ByteCommand::LET:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("LET " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = op1->dValue <= op2->dValue ? 1.0 : 0.0;
+			}
+			break;
+			case ByteCommand::GET:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("GET " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = op1->dValue >= op2->dValue ? 1.0 : 0.0;
+			}
+			break;
+			case ByteCommand::EQ:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("EQ " + op1->ToString() + " " + op2->ToString());
+
+				const clock_t tStart = clock();
+#endif
+
+				const double bRes = Variant::Equal(op1, op2) ? 1.0 : 0.0;
+				op1->Free();
+				op2->Free();
+				op1->dValue = bRes;
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::NEQ:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("NEQ " + op1->ToString() + " " + op2->ToString());
+
+				const clock_t tStart = clock();
+#endif
+
+				const double bRes = Variant::Equal(op1, op2) ? 0.0 : 1.0;
+				op1->Free();
+				op2->Free();
+				op1->dValue = bRes;
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::JZ:
+			{
+				if ((m_sp++)->dValue == 0.0)
+				{
+					const long offset = *((long*)pc);
+					pc = program + offset;
+
+#ifdef _DEBUG
+					Log("JZ " + std::to_string(offset) + " TRUE");
+#endif
+				}
+				else
+				{
+					pc += sizeof(long long);
+
+#ifdef _DEBUG
+					Log("JZ FALSE");
+#endif
+				}
+			}
+			break;
+			case ByteCommand::JNZ:
+			{
+				if ((m_sp++)->dValue != 0.0)
+				{
+					const long offset = *((long*)pc);
+					pc = program + offset;
+
+#ifdef _DEBUG
+					Log("JNZ " + std::to_string(offset) + " TRUE");
+#endif
+				}
+				else
+				{
+					pc += sizeof(long long);
+
+#ifdef _DEBUG
+					Log("JNZ FALSE");
+#endif
+				}
+			}
+			break;
+			case ByteCommand::JMP:
 			{
 				const long offset = *((long*)pc);
 				pc = program + offset;
 
 #ifdef _DEBUG
-				Log("JZ " + std::to_string(offset) + " TRUE");
+				Log("JMP " + std::to_string(offset));
 #endif
 			}
-			else
+			break;
+			case ByteCommand::PRINT:
 			{
-				pc += sizeof(long long);
-
 #ifdef _DEBUG
-				Log("JZ FALSE");
+				Log("PRINT");
 #endif
+
+				std::cout << m_sp->ToString() << std::endl;
+				(m_sp++)->Free();
 			}
-		}
-		break;
-		case ByteCommand::JNZ:
-		{
-			if ((m_sp++)->dValue != 0.0)
+			break;
+			case ByteCommand::NONE:
 			{
-				const long offset = *((long*)pc);
-				pc = program + offset;
-
 #ifdef _DEBUG
-				Log("JNZ " + std::to_string(offset) + " TRUE");
+				Log("NONE");
 #endif
 			}
-			else
+			break;
+			case ByteCommand::HALT:
 			{
-				pc += sizeof(long long);
-
 #ifdef _DEBUG
-				Log("JNZ FALSE");
+				Log("HALT");
 #endif
+
+				return;
 			}
-		}
-		break;
-		case ByteCommand::JMP:
-		{
-			const long offset = *((long*)pc);
-			pc = program + offset;
-
-#ifdef _DEBUG
-			Log("JMP " + std::to_string(offset));
-#endif
-		}
-		break;
-		case ByteCommand::PRINT:
-		{
-#ifdef _DEBUG
-			Log("PRINT");
-#endif
-
-			std::cout << m_sp->ToString() << std::endl;
-			(m_sp++)->Free();
-		}
-		break;
-		case ByteCommand::NONE:
-		{
-#ifdef _DEBUG
-			Log("NONE");
-#endif
-		}
-		break;
-		case ByteCommand::HALT:
-		{
-#ifdef _DEBUG
-			Log("HALT");
-#endif
-
-			return;
-		}
-		break;
-		case ByteCommand::DUP:
-		{
-#ifdef _DEBUG
-			Log("DUP " + m_sp->ToString());
-#endif
-
-			*m_sp = m_sp->Duplicate();
-		}
-		break;
-		case ByteCommand::NARG:
-		{
-			if (m_sp - 1 == m_bp)
+			break;
+			case ByteCommand::DUP:
 			{
-				Resize();
-			}
-			const byte offset = *((byte*)pc);
-			pc += sizeof(byte);
-
 #ifdef _DEBUG
-			Log("NARG " + std::to_string(offset));
+				Log("DUP " + m_sp->ToString());
 #endif
 
-			byte* arg = *(m_bArgs + offset);
-			if (offset > c_bArgsCount || !arg)
-			{
-				throw ex_argDoesntExists;
+				* m_sp = m_sp->Duplicate();
 			}
-
-			*(--m_sp) = Variant(*((double*)arg));
-		}
-		break;
-		case ByteCommand::SARG:
-		{
-			if (m_sp - 1 == m_bp)
+			break;
+			case ByteCommand::NARG:
 			{
-				Resize();
-			}
-			const byte offset = *((byte*)pc);
-			pc += sizeof(byte);
+				if (m_sp - 1 == m_bp)
+				{
+					Resize();
+				}
+				const byte offset = *((byte*)pc);
+				pc += sizeof(byte);
 
 #ifdef _DEBUG
-			Log("SARG " + std::to_string(offset));
+				Log("NARG " + std::to_string(offset));
 #endif
 
-			byte* arg = *(m_bArgs + offset);
-			if (offset > c_bArgsCount || !arg)
-			{
-				throw ex_argDoesntExists;
-			}
+				byte* arg = *(m_bArgs + offset);
+				if (offset > c_bArgsCount || !arg)
+				{
+					throw ex_argDoesntExists(offset);
+				}
 
-			char* sArg = reinterpret_cast<char*>(arg);
-			const unsigned int len = (unsigned int)(strchr(sArg, '\0') - sArg);
-			char* str = new char[len + sizeof(int)];
-			*((unsigned int*)str) = 1;
-			str += sizeof(unsigned int);
-			memcpy(str, sArg, len);
-			*(--m_sp) = Variant(str, len);
+				*(--m_sp) = Variant(*((double*)arg));
+			}
+			break;
+			case ByteCommand::SARG:
+			{
+				if (m_sp - 1 == m_bp)
+				{
+					Resize();
+				}
+				const byte offset = *((byte*)pc);
+				pc += sizeof(byte);
+
+#ifdef _DEBUG
+				Log("SARG " + std::to_string(offset));
+#endif
+
+				byte* arg = *(m_bArgs + offset);
+				if (offset > c_bArgsCount || !arg)
+				{
+					throw ex_argDoesntExists(offset);
+				}
+
+				char* sArg = reinterpret_cast<char*>(arg);
+				const unsigned int len = (unsigned int)(strchr(sArg, '\0') - sArg);
+				char* str = new char[len + sizeof(int)];
+				*((unsigned int*)str) = 1;
+				str += sizeof(unsigned int);
+				memcpy(str, sArg, len);
+				*(--m_sp) = Variant(str, len);
+			}
+			break;
+			default:
+			{
+				return;
+			}
+			}
 		}
-		break;
-		default:
-		{
-			return;
-		}
-		}
+	}
+	catch (exception e)
+	{
+		throw exception((std::to_string(pc - program) + ": " + e.what()).c_str());
 	}
 }
 

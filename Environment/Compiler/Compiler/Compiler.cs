@@ -77,8 +77,16 @@ namespace Compiler
             public int oper;
             public int pos;
         }
+
         private static Dictionary<string, Coords> marks = new Dictionary<string, Coords>();
-        
+
+        internal class CException : Exception
+        {
+            public CException(string messege)
+                : base(i.ToString() + ": " + messege + "\n")
+            {}
+        }
+
         private static void ClearSpaces()
         {
             while (program[i] == ' ' || program[i] == '\r' || program[i] == '\t' || program[i] == '\n')
@@ -164,7 +172,7 @@ namespace Compiler
                     }
                     else if (sym != '|')
                     {
-                        //any exceptopn
+                        throw new CException("unexpected symbol. Use '|' to separate container members");
                     }
                 }
 
@@ -195,7 +203,7 @@ namespace Compiler
                 }
                 else
                 {
-                    throw new Exception("unexpected symbol");
+                    throw new CException("can't determine a Variant type");
                 }
             }
 
@@ -455,7 +463,7 @@ namespace Compiler
                         }
                         else
                         {
-                            throw new Exception("unknown command" + command);
+                            throw new CException("unknown command " + command);
                         }
                         break;
                 }

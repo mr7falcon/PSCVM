@@ -61,8 +61,22 @@ enum ByteCommand : byte
 class VirtualMachine
 {
 public:
-	static const exception ex_argDoesntExists;
-	static const exception ex_zeroDiv;
+
+	class ex_argDoesntExists : exception
+	{
+	public:
+		ex_argDoesntExists(const byte i)
+			: exception(("Argument does not exists " + std::to_string(i) + "\n").c_str())
+		{}
+	};
+
+	class ex_zeroDiv : exception
+	{
+	public:
+		ex_zeroDiv()
+			: exception("Division by zero\n")
+		{}
+	};
 
 	static inline void Initialize();
 	static inline void ShutDown();
