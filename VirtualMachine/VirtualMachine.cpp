@@ -2,76 +2,6 @@
 #include <cstring>
 #include <iostream>
 
-Variant* VirtualMachine::m_pStack;
-VirtualMachine::HeapChunk* VirtualMachine::m_pFirstChunk;
-VirtualMachine::HeapChunk* VirtualMachine::m_pCurrentChunk;
-Variant* VirtualMachine::m_sp;
-Variant* VirtualMachine::m_pCurrentSlot;
-Variant* VirtualMachine::m_bp;
-int VirtualMachine::m_nCapacity;
-byte* VirtualMachine::m_bArgs[4];
-#ifdef _DEBUG
-std::ofstream VirtualMachine::log;
-long VirtualMachine::g_memVar;
-int VirtualMachine::g_memChunk;
-#endif
-
-void VirtualMachine::Initialize()
-{
-	m_nCapacity = 64;
-	m_pStack = new Variant[m_nCapacity];
-	m_sp = m_pStack + m_nCapacity;
-	m_bp = m_pStack - 1;
-
-	m_pFirstChunk = m_pCurrentChunk = new HeapChunk;
-	m_pCurrentSlot = m_pCurrentChunk->vData;
-
-#ifdef _DEBUG
-	log.open("log.log");
-	if (!log.is_open())
-	{
-		throw exception("file opening error");
-	}
-
-	g_memVar = 0;
-	g_memChunk = 1;
-#endif
-}
-
-void VirtualMachine::ShutDown()
-{
-	for (Variant* iter = m_pStack; iter <= m_bp; ++iter)
-	{
-		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
-		{
-			char* str = (char*)iter->pValue - sizeof(unsigned int);
-			delete[](str);
-		}
-	}
-
-	const Variant* pStop = m_pStack + m_nCapacity;
-	for (Variant* iter = m_sp; iter < pStop; ++iter)
-	{
-		if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
-		{
-			char* str = (char*)iter->pValue - sizeof(unsigned int);
-			delete[](str);
-		}
-	}
-
-	HeapChunk* iter = m_pFirstChunk;	
-	while (iter)
-	{
-		HeapChunk* next = iter->pNext;
-		delete(iter);
-		iter = next;
-	}
-
-#ifdef _DEBUG
-	LogMemory();
-#endif
-}
-
 inline void VirtualMachine::Resize()
 {
 #ifdef _DEBUG
@@ -279,20 +209,105 @@ VirtualMachine::HeapChunk::~HeapChunk()
 #endif
 }
 
+Variant VirtualMachine::FromBytes()
+{
+	Variant var(*((double*)m_pc));
+	m_pc += sizeof(double);
+
+	if (var.usNull == Variant::c_null)
+	{
+		const unsigned int length = var.nLength;
+		if (var.usType == VarType::STR)
+		{
+			char* str = new char[length + sizeof(unsigned int)];
+			*((unsigned int*)str) = 1;
+			str += sizeof(unsigned int);
+			memcpy(str, m_pc, length);
+			m_pc += length;
+			var.pValue = str;
+		}
+		else if (var.usType == VarType::ARR)
+		{
+			unsigned int length = var.nLength;
+			Variant* pArr = VirtualMachine::HeapAlloc(length);
+			Variant* pLocalDesc = (Variant*)pArr->pValue;
+
+			while (pLocalDesc->pValue)
+			{
+				const unsigned int capacity = pLocalDesc->nCap;
+				const Variant* pStop = pLocalDesc + capacity;
+				for (Variant* p = pLocalDesc + 1; p <= pStop; ++p)
+				{
+					*p = FromBytes();
+				}
+				pLocalDesc = (Variant*)pLocalDesc->pValue;
+				length -= capacity;
+			}
+
+			const Variant* pStop = pLocalDesc + length;
+			for (Variant* p = pLocalDesc + 1; p <= pStop; ++p)
+			{
+				*p = FromBytes();
+			}
+
+			var.pValue = pArr;
+		}
+		else if (var.usType == VarType::DICT)
+		{
+			const unsigned int length = var.nLength;
+			const unsigned int cap = GetPrime(length);
+			Variant* pGlobalDesc = VirtualMachine::HeapAlloc(cap);
+			var.pValue = pGlobalDesc;
+			Variant* pBucketDesc = VirtualMachine::HeapAllocStructArr(length);
+
+			while (pBucketDesc)
+			{
+				const unsigned int bucketCap = pBucketDesc->nCap;
+				Bucket* pBucketArr = (Bucket*)(pBucketDesc + 1);
+				for (Bucket* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; ++pBucket)
+				{
+					Variant key = FromBytes();
+					const unsigned int index = key.GetHash() % cap;
+
+					Variant* cell = var.Get(index);
+					pBucket->key = key;
+					pBucket->value = FromBytes();
+
+					if (cell->pValue == nullptr)
+					{
+						cell->lValue = 1;
+						cell->pValue = pBucket;
+					}
+					else
+					{
+						pBucket->next.pValue = cell->pValue;
+						++cell->lValue;
+						cell->pValue = pBucket;
+					}
+				}
+
+				pBucketDesc = (Variant*)pBucketDesc->pValue;
+			}
+		}
+	}
+
+	return var;
+}
+
 void VirtualMachine::Run(byte* program)
 {
-	byte* pc = program;
+	m_pc = program;
 
 	try
 	{
 		while (true)
 		{
-			switch ((ByteCommand) * (pc++))
+			switch ((ByteCommand) * (m_pc++))
 			{
 			case ByteCommand::CALL:
 			{
-				const int mark = *((long*)pc);
-				pc += sizeof(long long);
+				const int mark = *((long*)m_pc);
+				m_pc += sizeof(long long);
 
 #ifdef _DEBUG
 				Log("CALL " + std::to_string(mark));
@@ -302,8 +317,8 @@ void VirtualMachine::Run(byte* program)
 				{
 					Resize();
 				}
-				(++m_bp)->lValue = (long)(pc - program);
-				pc = program + mark;
+				(++m_bp)->lValue = (long)(m_pc - program);
+				m_pc = program + mark;
 			}
 			break;
 			case ByteCommand::RET:
@@ -312,7 +327,7 @@ void VirtualMachine::Run(byte* program)
 				Log("RET");
 #endif
 
-				pc = program + (long)(m_bp--)->lValue;
+				m_pc = program + (long)(m_bp--)->lValue;
 			}
 			break;
 			case ByteCommand::FETCH:
@@ -321,8 +336,8 @@ void VirtualMachine::Run(byte* program)
 				{
 					Resize();
 				}
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("FETCH " + std::to_string(offset));
@@ -334,8 +349,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::STORE:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("STORE " + m_sp->ToString() + " " + std::to_string(offset));
@@ -350,8 +365,8 @@ void VirtualMachine::Run(byte* program)
 				{
 					Resize();
 				}
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("LFETCH " + std::to_string(offset));
@@ -363,8 +378,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::LSTORE:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("LSTORE " + m_sp->ToString() + " " + std::to_string(offset));
@@ -375,8 +390,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::AFETCH:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 				if (m_sp->usNull == Variant::c_null)
 				{
@@ -408,8 +423,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::ASTORE:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 				if (m_sp->usNull == Variant::c_null)
 				{
@@ -439,8 +454,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::APUSH:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("APUSH " + m_sp->ToString() + " " + std::to_string(offset));
@@ -448,7 +463,26 @@ void VirtualMachine::Run(byte* program)
 				const clock_t tStart = clock();
 #endif
 
-				(m_pStack + m_nCapacity - offset)->PushBack(m_sp++);
+				Variant* arr = m_pStack + m_nCapacity - offset;
+
+				if (arr->usNull == Variant::c_null && arr->usType == VarType::ARR)
+				{
+					Variant* pGlobalDesc = (Variant*)arr->pValue;
+					unsigned int cap = pGlobalDesc->nCap;
+					const unsigned int len = arr->nLength;
+					if (len == cap)
+					{
+						const int short inc = cap >> Variant::c_capInc;
+						Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc, true);
+						*(pLocalDesc + 1) = *(m_sp++);
+						arr->PushBack(pLocalDesc);
+						pGlobalDesc->nCap += inc;
+					}
+					else
+					{
+						*(arr->Get(len)) = *(m_sp++);
+					}
+				}
 
 #ifdef _DEBUG
 				const clock_t tEnd = clock();
@@ -458,8 +492,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::DFETCH:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("DFETCH " + std::to_string(offset) + " " + m_sp->ToString());
@@ -480,8 +514,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::DSTORE:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 				Variant* key = m_sp++;
 
@@ -502,8 +536,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::DINSERT:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 				Variant* key = m_sp++;
 
@@ -512,8 +546,8 @@ void VirtualMachine::Run(byte* program)
 
 				const clock_t tStart = clock();
 #endif
-
-				(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++);
+				Bucket* bucket = (Bucket*)VirtualMachine::HeapAllocStruct();
+				(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++, bucket);
 
 #ifdef _DEBUG
 				const clock_t tEnd = clock();
@@ -523,8 +557,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::LALLOC:
 			{
-				const int size = *((int*)pc);
-				pc += sizeof(int);
+				const int size = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("LALLOC " + std::to_string(size));
@@ -628,8 +662,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::APOP:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("APOP " + std::to_string(offset));
@@ -647,8 +681,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::DERASE:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("DERASE " + std::to_string(offset) + " " + m_sp->ToString());
@@ -671,7 +705,7 @@ void VirtualMachine::Run(byte* program)
 				{
 					Resize();
 				}
-				*(--m_sp) = Variant::FromBytes(&pc);
+				*(--m_sp) = FromBytes();
 
 #ifdef _DEBUG
 				Log("PUSH " + m_sp->ToString());
@@ -721,8 +755,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::INC:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("INC " + std::to_string(offset));
@@ -738,8 +772,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::DEC:
 			{
-				const int offset = *((int*)pc);
-				pc += sizeof(int);
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
 
 #ifdef _DEBUG
 				Log("DEC " + std::to_string(offset));
@@ -975,8 +1009,8 @@ void VirtualMachine::Run(byte* program)
 			{
 				if ((m_sp++)->dValue == 0.0)
 				{
-					const long offset = *((long*)pc);
-					pc = program + offset;
+					const long offset = *((long*)m_pc);
+					m_pc = program + offset;
 
 #ifdef _DEBUG
 					Log("JZ " + std::to_string(offset) + " TRUE");
@@ -984,7 +1018,7 @@ void VirtualMachine::Run(byte* program)
 				}
 				else
 				{
-					pc += sizeof(long long);
+					m_pc += sizeof(long long);
 
 #ifdef _DEBUG
 					Log("JZ FALSE");
@@ -996,8 +1030,8 @@ void VirtualMachine::Run(byte* program)
 			{
 				if ((m_sp++)->dValue != 0.0)
 				{
-					const long offset = *((long*)pc);
-					pc = program + offset;
+					const long offset = *((long*)m_pc);
+					m_pc = program + offset;
 
 #ifdef _DEBUG
 					Log("JNZ " + std::to_string(offset) + " TRUE");
@@ -1005,7 +1039,7 @@ void VirtualMachine::Run(byte* program)
 				}
 				else
 				{
-					pc += sizeof(long long);
+					m_pc += sizeof(long long);
 
 #ifdef _DEBUG
 					Log("JNZ FALSE");
@@ -1015,8 +1049,8 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::JMP:
 			{
-				const long offset = *((long*)pc);
-				pc = program + offset;
+				const long offset = *((long*)m_pc);
+				m_pc = program + offset;
 
 #ifdef _DEBUG
 				Log("JMP " + std::to_string(offset));
@@ -1055,7 +1089,11 @@ void VirtualMachine::Run(byte* program)
 				Log("DUP " + m_sp->ToString());
 #endif
 
-				* m_sp = m_sp->Duplicate();
+				if (m_sp->usNull == Variant::c_null && m_sp->usType == VarType::ARR)
+				{
+					Variant* pGlobalDesc2 = VirtualMachine::HeapAlloc(((Variant*)m_sp->pValue)->nCap);
+					*m_sp = m_sp->Duplicate(pGlobalDesc2);
+				}
 			}
 			break;
 			case ByteCommand::NARG:
@@ -1064,8 +1102,8 @@ void VirtualMachine::Run(byte* program)
 				{
 					Resize();
 				}
-				const byte offset = *((byte*)pc);
-				pc += sizeof(byte);
+				const byte offset = *((byte*)m_pc);
+				m_pc += sizeof(byte);
 
 #ifdef _DEBUG
 				Log("NARG " + std::to_string(offset));
@@ -1086,8 +1124,8 @@ void VirtualMachine::Run(byte* program)
 				{
 					Resize();
 				}
-				const byte offset = *((byte*)pc);
-				pc += sizeof(byte);
+				const byte offset = *((byte*)m_pc);
+				m_pc += sizeof(byte);
 
 #ifdef _DEBUG
 				Log("SARG " + std::to_string(offset));
@@ -1117,7 +1155,7 @@ void VirtualMachine::Run(byte* program)
 	}
 	catch (exception e)
 	{
-		throw exception((std::to_string(pc - program) + ": " + e.what()).c_str());
+		throw exception((std::to_string(m_pc - program) + ": " + e.what()).c_str());
 	}
 }
 
@@ -1125,88 +1163,128 @@ extern "C"
 {
 	__declspec(dllexport) void __stdcall Run0(byte* program)
 	{
-		return Run(program);
+		VirtualMachine vm;
+		vm.Run(program);
 	}
 
 	__declspec(dllexport) void __stdcall Run1(byte* program, byte* arg0)
 	{
-		VirtualMachine::ProvideArgs(arg0);
-		Run(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0);
+		vm.Run(program);
 	}
 
 	__declspec(dllexport) void __stdcall Run2(byte* program, byte* arg0, byte* arg1)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1);
-		Run(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1);
+		vm.Run(program);
 	}
 
 	__declspec(dllexport) void __stdcall Run3(byte* program, byte* arg0, byte* arg1, byte* arg2)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1, arg2);
-		Run(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1, arg2);
+		vm.Run(program);
 	}
 
 	__declspec(dllexport) void __stdcall Run4(byte* program, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1, arg2, arg3);
-		Run(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1, arg2, arg3);
+		vm.Run(program);
 	}
 
 	__declspec(dllexport) double __stdcall NumRun0(byte* program)
 	{
-		return NumRun(program);
+		VirtualMachine vm;
+		vm.Run(program);
+		double num = vm.Return().dValue;
+		return num;
 	}
 
 	__declspec(dllexport) double __stdcall NumRun1(byte* program, byte* arg0)
 	{
-		VirtualMachine::ProvideArgs(arg0);
-		return NumRun(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0);
+		vm.Run(program);
+		double num = vm.Return().dValue;
+		return num;
 	}
 
 	__declspec(dllexport) double __stdcall NumRun2(byte* program, byte* arg0, byte* arg1)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1);
-		return NumRun(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1);
+		vm.Run(program);
+		double num = vm.Return().dValue;
+		return num;
 	}
 
 	__declspec(dllexport) double __stdcall NumRun3(byte* program, byte* arg0, byte* arg1, byte* arg2)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1, arg2);
-		return NumRun(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1, arg2);
+		vm.Run(program);
+		double num = vm.Return().dValue;
+		return num;
 	}
 
 	__declspec(dllexport) double __stdcall NumRun4(byte* program, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1, arg2, arg3);
-		return NumRun(program);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1, arg2, arg3);
+		vm.Run(program);
+		double num = vm.Return().dValue;
+		return num;
 	}
 
 	__declspec(dllexport) void __stdcall StrRun0(byte* program, char* res)
 	{
-		return StrRun(program, res);
+		VirtualMachine vm;
+		vm.Run(program);
+		Variant var = vm.Return();
+		memcpy(res, var.pValue, var.nLength);
+		*(res + var.nLength) = '\0';
 	}
 
 	__declspec(dllexport) void __stdcall StrRun1(byte* program, char* res, byte* arg0)
 	{
-		VirtualMachine::ProvideArgs(arg0);
-		return StrRun(program, res);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0);
+		vm.Run(program);
+		Variant var = vm.Return();
+		memcpy(res, var.pValue, var.nLength);
+		*(res + var.nLength) = '\0';
 	}
 
 	__declspec(dllexport) void __stdcall StrRun2(byte* program, char* res, byte* arg0, byte* arg1)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1);
-		return StrRun(program, res);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1);
+		vm.Run(program);
+		Variant var = vm.Return();
+		memcpy(res, var.pValue, var.nLength);
+		*(res + var.nLength) = '\0';
 	}
 
 	__declspec(dllexport) void __stdcall StrRun3(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1, arg2);
-		return StrRun(program, res);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1, arg2);
+		vm.Run(program);
+		Variant var = vm.Return();
+		memcpy(res, var.pValue, var.nLength);
+		*(res + var.nLength) = '\0';
 	}
 
 	__declspec(dllexport) void __stdcall StrRun4(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
 	{
-		VirtualMachine::ProvideArgs(arg0, arg1, arg2, arg3);
-		return StrRun(program, res);
+		VirtualMachine vm;
+		vm.ProvideArgs(arg0, arg1, arg2, arg3);
+		vm.Run(program);
+		Variant var = vm.Return();
+		memcpy(res, var.pValue, var.nLength);
+		*(res + var.nLength) = '\0';
 	}
 }

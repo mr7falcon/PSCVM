@@ -78,10 +78,64 @@ public:
 		{}
 	};
 
-	static inline void Initialize();
-	static inline void ShutDown();
+	inline VirtualMachine()
+		: m_nCapacity(64),
+		  m_sp(m_pStack + m_nCapacity),
+		  m_bp(m_pStack - 1),
+		  m_pc(0)
+	{
+		m_pStack = new Variant[m_nCapacity];
+		
+		m_pFirstChunk = m_pCurrentChunk = new HeapChunk;
+		m_pCurrentSlot = m_pCurrentChunk->vData;
 
-	static inline Variant* HeapAlloc(const unsigned int count, bool local = false)
+#ifdef _DEBUG
+		log.open("log.log");
+		if (!log.is_open())
+		{
+			throw exception("file opening error");
+		}
+
+		g_memVar = 0;
+		g_memChunk = 1;
+#endif
+	}
+
+	inline ~VirtualMachine()
+	{
+		for (Variant* iter = m_pStack; iter <= m_bp; ++iter)
+		{
+			if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
+			{
+				char* str = (char*)iter->pValue - sizeof(unsigned int);
+				delete[](str);
+			}
+		}
+
+		const Variant* pStop = m_pStack + m_nCapacity;
+		for (Variant* iter = m_sp; iter < pStop; ++iter)
+		{
+			if (iter->usNull == Variant::c_null && iter->usType == VarType::STR)
+			{
+				char* str = (char*)iter->pValue - sizeof(unsigned int);
+				delete[](str);
+			}
+		}
+
+		HeapChunk* iter = m_pFirstChunk;
+		while (iter)
+		{
+			HeapChunk* next = iter->pNext;
+			delete(iter);
+			iter = next;
+		}
+
+#ifdef _DEBUG
+		LogMemory();
+#endif
+	}
+
+	inline Variant* HeapAlloc(const unsigned int count, bool local = false)
 	{
 		Variant* pGlobalDesc = m_pCurrentSlot;
 		Variant* pLocalDesc = pGlobalDesc;
@@ -179,7 +233,7 @@ public:
 		return pGlobalDesc;
 	}
 
-	static inline Variant* HeapAllocStructArr(const unsigned int count)
+	inline Variant* HeapAllocStructArr(const unsigned int count)
 	{
 		const unsigned short size = 3;
 		Variant* pGlobalDesc = m_pCurrentSlot;
@@ -254,7 +308,7 @@ public:
 		return pGlobalDesc;
 	}
 
-	static inline Variant* HeapAllocStruct()
+	inline Variant* HeapAllocStruct()
 	{
 		const unsigned short size = 3;
 		const unsigned short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - m_pCurrentSlot);
@@ -290,9 +344,9 @@ public:
 		return p;
 	}
 
-	static inline void Run(byte* program);
-	static inline Variant Return() { return *m_sp; }
-	static inline void ProvideArgs(byte* arg0 = nullptr, byte* arg1 = nullptr, byte* arg2 = nullptr, byte* arg3 = nullptr)
+	inline void Run(byte* program);
+	inline Variant Return() { return *m_sp; }
+	inline void ProvideArgs(byte* arg0 = nullptr, byte* arg1 = nullptr, byte* arg2 = nullptr, byte* arg3 = nullptr)
 	{
 		m_bArgs[0] = arg0;
 		m_bArgs[1] = arg1;
@@ -301,23 +355,25 @@ public:
 	}
 
 private:
-	VirtualMachine();
 
 	static const unsigned short c_nChunkSize = 511;
 	static const unsigned short c_nChunkCapacity = 510;
 	static const unsigned short c_nChunkSizeStruct = 170;
 
-	static inline void Resize();
+	inline void Resize();
 
-	static inline void HeapCollect();
-	static inline void CheckReferences(Variant* from, Variant* to);
-	static void HeapMove(Variant* from, Variant* to);
-	static inline void DictEntryMove(Variant* from, Variant* to, Bucket** newBucket);
+	inline void HeapCollect();
+	inline void CheckReferences(Variant* from, Variant* to);
+	void HeapMove(Variant* from, Variant* to);
+	inline void DictEntryMove(Variant* from, Variant* to, Bucket** newBucket);
 
-	static Variant* m_pStack;
-	static int m_nCapacity;
-	static Variant* m_sp;
-	static Variant* m_bp;
+	Variant FromBytes();
+
+	Variant* m_pStack;
+	int m_nCapacity;
+	Variant* m_sp;
+	Variant* m_bp;
+	byte* m_pc;
 
 	struct HeapChunk
 	{
@@ -333,55 +389,29 @@ private:
 
 		inline ~HeapChunk();
 	};
-	static HeapChunk* m_pFirstChunk;
-	static HeapChunk* m_pCurrentChunk;
-	static Variant* m_pCurrentSlot;
+	HeapChunk* m_pFirstChunk;
+	HeapChunk* m_pCurrentChunk;
+	Variant* m_pCurrentSlot;
 
 	static const byte c_bArgsCount = 4;
-	static byte* m_bArgs[c_bArgsCount];
+	byte* m_bArgs[c_bArgsCount];
 
 #ifdef _DEBUG
-	static std::ofstream log;
-	static inline void Log(const string messege)
+	std::ofstream log;
+	inline void Log(const string messege)
 	{
 		log << messege << std::endl;
 	}
-	static void LogMemory()
+	void LogMemory()
 	{
 		log << "Memory: chunk " << g_memChunk << " var " << g_memVar << std::endl;
 	}
-	static void LogTime(const clock_t time)
+	void LogTime(const clock_t time)
 	{
 		log << "Time: " << time << std::endl;
 	}
 
-	static long g_memVar;
-	static int g_memChunk;
+	long g_memVar;
+	int g_memChunk;
 #endif
 };
-
-inline void Run(byte* program)
-{
-	VirtualMachine::Initialize();
-	VirtualMachine::Run(program);
-	VirtualMachine::ShutDown();
-}
-
-inline double NumRun(byte* program)
-{
-	VirtualMachine::Initialize();
-	VirtualMachine::Run(program);
-	double num = VirtualMachine::Return().dValue;
-	VirtualMachine::ShutDown();
-	return num;
-}
-
-inline void StrRun(byte* program, char* res)
-{
-	VirtualMachine::Initialize();
-	VirtualMachine::Run(program);
-	Variant var = VirtualMachine::Return();
-	memcpy(res, var.pValue, var.nLength);
-	*(res + var.nLength) = '\0';
-	VirtualMachine::ShutDown();
-}

@@ -124,11 +124,44 @@ struct Variant
 		return p + 1 + index;
 	}
 
-	void PushBack(Variant* var); //better to be inline but cant be that with VM methods
+	inline void PushBack(Variant* pLocalDesc)
+	{
+		Variant* pGlobalDesc = (Variant*)pValue;
+		Variant* p = (Variant*)pGlobalDesc->pValue;
+		while (p->pValue)
+		{
+			p = (Variant*)p->pValue;
+		}
+		p->pValue = pLocalDesc;
+	}
 
 	Variant* Find(Variant* key) const;		//same with Bucket
 
-	void Insert(Variant* key, Variant* val);	//same as PushBack
+	inline void Insert(Variant* key, Variant* val, Bucket* bucket)
+	{
+		const unsigned int capacity = ((Variant*)pValue)->nCap;
+		unsigned int index = key->GetHash() % capacity;
+
+		Variant* entry = (Variant*)Get(index);
+		//if entry->lValue more then trashhold constante, hash would be resized
+
+		bucket->key = *key;
+		bucket->value = *val;
+
+		if (entry->pValue == nullptr)
+		{
+			entry->lValue = 1;
+			entry->pValue = bucket;
+		}
+		else
+		{
+			bucket->next.pValue = entry->pValue;
+			++entry->lValue;
+			entry->pValue = bucket;
+		}
+
+		++nLength;
+	}
 
 	const unsigned long GetHash() const;
 
@@ -189,10 +222,57 @@ struct Variant
 	}
 
 	static bool Equal(Variant* op1, Variant* op2);
-	Variant Duplicate();
+	
+	inline Variant Duplicate(Variant* pGlobalDesc2)
+	{
+		Variant* pGlobalDesc1 = (Variant*)pValue;
+		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
+		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
+		Variant* pArr1 = pLocalDesc1 + 1;
+		Variant* pArr2 = pLocalDesc2 + 1;
+		unsigned int stop1 = pLocalDesc1->nCap;
+		unsigned int stop2 = pLocalDesc2->nCap;
+
+		while (true)
+		{
+			if (stop1 <= stop2)
+			{
+				memcpy(pArr2, pArr1, (unsigned int)stop1 * sizeof(Variant));
+				stop2 -= stop1;
+				pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
+
+				if (!pLocalDesc1)
+				{
+					break;
+				}
+
+				pArr2 += stop1;
+				stop1 = pLocalDesc1->nCap;
+				pArr1 = pLocalDesc1 + 1;
+			}
+			else
+			{
+				memcpy(pArr2, pArr1, (unsigned int)stop2 * sizeof(Variant));
+				stop1 -= stop2;
+				pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+
+				if (!pLocalDesc2)
+				{
+					break;
+				}
+
+				pArr1 += stop2;
+				stop2 = pLocalDesc2->nCap;
+				pArr2 = pLocalDesc2 + 1;
+			}
+		}
+
+		Variant var = Variant(pGlobalDesc2, nLength, VarType::ARR);
+		Free();
+		return var;
+	}
 
 	const string ToString() const;
-	static Variant FromBytes(byte** pc);
 
 	inline static string TypeToString(VarType type)
 	{
