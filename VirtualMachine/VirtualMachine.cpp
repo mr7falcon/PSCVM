@@ -22,26 +22,26 @@ inline void VirtualMachine::Resize()
 	m_nCapacity = m_nCapacity + inc;
 }
 
-void VirtualMachine::DictEntryMove(Variant* from, Variant* to, Bucket** newBucket)
+void VirtualMachine::DictEntryMove(Variant* from, Variant* to, Variant** newBucket)
 {
-	Bucket* pBucket;
-	Bucket* pNewBucket;
+	Variant* pBucket;
+	Variant* pNewBucket;
 
 	if (from->pValue)
 	{
 		to->lValue = from->lValue;
 		void** prev = &to->pValue;
-		pBucket = (Bucket*)from->pValue;
+		pBucket = (Variant*)from->pValue;
 
 		while (pBucket)
 		{
 			pNewBucket = *newBucket;
-			HeapMove(&pBucket->key, &pNewBucket->key);
-			HeapMove(&pBucket->value, &pNewBucket->value);
+			HeapMove(pBucket + KEY, pNewBucket + KEY);
+			HeapMove(pBucket + VALUE, pNewBucket + VALUE);
 			*prev = pNewBucket;
-			pBucket = (Bucket*)pBucket->next.pValue;
-			prev = &pNewBucket->next.pValue;
-			++(*newBucket);
+			pBucket = (Variant*)(pBucket + NEXT)->pValue;
+			prev = &(pNewBucket + NEXT)->pValue;
+			*newBucket += BUCKET_SIZE;
 		}
 	}
 }
@@ -100,9 +100,9 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 			{
 				Variant* pBucketDesc = HeapAllocStructArr(length);
 				unsigned int nBucketCap = pBucketDesc->nCap;
-				Bucket* pBucketArr = (Bucket*)(pBucketDesc + 1);
-				Bucket* pNewBucket = pBucketArr;
-				Bucket* pBucket;
+				Variant* pBucketArr = (Variant*)(pBucketDesc + 1);
+				Variant* pNewBucket = pBucketArr;
+				Variant* pBucket;
 
 				while (pLocalDesc)
 				{
@@ -114,21 +114,22 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 						{
 							to->lValue = from->lValue;
 							void** prev = &to->pValue;
-							pBucket = (Bucket*)from->pValue;
+							pBucket = (Variant*)from->pValue;
 
 							while (pBucket)
 							{
-								HeapMove(&pBucket->key, &pNewBucket->key);
-								HeapMove(&pBucket->value, &pNewBucket->value);
+								HeapMove(pBucket + KEY, pNewBucket + VALUE);
+								HeapMove(pBucket + KEY, pNewBucket + VALUE);
 								*prev = pNewBucket;
-								pBucket = (Bucket*)pBucket->next.pValue;
-								prev = &pNewBucket->next.pValue;
+								pBucket = (Variant*)(pBucket + NEXT)->pValue;
+								prev = &(pNewBucket + NEXT)->pValue;
+								pNewBucket += BUCKET_SIZE;
 								
 								if (++pNewBucket == pBucketArr + nBucketCap)
 								{
 									pBucketDesc = (Variant*)pBucketDesc->pValue;
 									nBucketCap = pBucketDesc->nCap;
-									pBucketArr = (Bucket*)(pBucketDesc + 1);
+									pBucketArr = (Variant*)(pBucketDesc + 1);
 									pNewBucket = pBucketArr;
 								}
 							}
@@ -153,6 +154,11 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 void VirtualMachine::HeapCollect()
 {
 	HeapChunk* pFirstChunk = m_pCurrentChunk = new HeapChunk;
+
+#ifdef _DEBUG
+	++g_memChunk;
+#endif
+
 	m_pCurrentSlot = m_pCurrentChunk->vData;
 
 	for (Variant* bp = m_pStack; bp <= m_bp; ++bp)
@@ -171,6 +177,20 @@ void VirtualMachine::HeapCollect()
 	while (iter)
 	{
 		HeapChunk* next = iter->pNext;
+
+#ifdef _DEBUG
+		if (!next)
+		{
+			const unsigned short diff = (unsigned short)(m_pCurrentSlot - iter->vData);
+			g_memVar -= diff;
+		}
+		else
+		{
+			g_memVar -= c_nChunkCapacity;
+		}
+		--g_memChunk;
+#endif
+
 		delete(iter);
 		iter = next;
 	}
@@ -194,19 +214,6 @@ VirtualMachine::HeapChunk::~HeapChunk()
 	{
 		iter->Free();
 	}
-
-#ifdef _DEBUG
-	const unsigned short diff = (unsigned short)(m_pCurrentSlot - vData);
-	if (diff < c_nChunkCapacity)
-	{
-		g_memVar -= diff;
-	}
-	else
-	{
-		g_memVar -= c_nChunkCapacity;
-	}
-	--g_memChunk;
-#endif
 }
 
 Variant VirtualMachine::FromBytes()
@@ -262,16 +269,16 @@ Variant VirtualMachine::FromBytes()
 
 			while (pBucketDesc)
 			{
-				const unsigned int bucketCap = pBucketDesc->nCap;
-				Bucket* pBucketArr = (Bucket*)(pBucketDesc + 1);
-				for (Bucket* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; ++pBucket)
+				const unsigned int bucketCap = pBucketDesc->nCap * BUCKET_SIZE;
+				Variant* pBucketArr = (Variant*)(pBucketDesc + 1);
+				for (Variant* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; pBucket += BUCKET_SIZE)
 				{
 					Variant key = FromBytes();
 					const unsigned int index = key.GetHash() % cap;
 
 					Variant* cell = var.Get(index);
-					pBucket->key = key;
-					pBucket->value = FromBytes();
+					*(pBucket + KEY) = key;
+					*(pBucket + VALUE) = FromBytes();
 
 					if (cell->pValue == nullptr)
 					{
@@ -280,7 +287,7 @@ Variant VirtualMachine::FromBytes()
 					}
 					else
 					{
-						pBucket->next.pValue = cell->pValue;
+						(pBucket + NEXT)->pValue = cell->pValue;
 						++cell->lValue;
 						cell->pValue = pBucket;
 					}
@@ -472,7 +479,13 @@ void VirtualMachine::Run(byte* program)
 					const unsigned int len = arr->nLength;
 					if (len == cap)
 					{
-						const int short inc = cap >> Variant::c_capInc;
+						unsigned int inc = cap >> Variant::c_capInc;
+
+						if (inc == 0)
+						{
+							inc = 1;
+						}
+
 						Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc, true);
 						*(pLocalDesc + 1) = *(m_sp++);
 						arr->PushBack(pLocalDesc);
@@ -482,6 +495,8 @@ void VirtualMachine::Run(byte* program)
 					{
 						*(arr->Get(len)) = *(m_sp++);
 					}
+
+					++arr->nLength;
 				}
 
 #ifdef _DEBUG
@@ -546,7 +561,7 @@ void VirtualMachine::Run(byte* program)
 
 				const clock_t tStart = clock();
 #endif
-				Bucket* bucket = (Bucket*)VirtualMachine::HeapAllocStruct();
+				Variant* bucket = VirtualMachine::HeapAllocStruct();
 				(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++, bucket);
 
 #ifdef _DEBUG
@@ -1144,6 +1159,14 @@ void VirtualMachine::Run(byte* program)
 				str += sizeof(unsigned int);
 				memcpy(str, sArg, len);
 				*(--m_sp) = Variant(str, len);
+			}
+			break;
+			case ByteCommand::ASSERT:
+			{
+				if ((m_sp++)->dValue == 0.0)
+				{
+					throw std::exception("FAIL\n");
+				}
 			}
 			break;
 			default:

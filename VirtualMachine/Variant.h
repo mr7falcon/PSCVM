@@ -7,7 +7,10 @@ using std::exception;
 
 typedef unsigned char byte;
 
-struct Bucket;
+#define KEY 0
+#define VALUE 1
+#define NEXT 2
+#define BUCKET_SIZE 3
 
 enum VarType : unsigned short
 {
@@ -86,7 +89,7 @@ struct Variant
 		  pValue(next)
 	{}
 
-	~Variant();
+	inline ~Variant() {}
 
 	inline void Free()
 	{
@@ -135,9 +138,27 @@ struct Variant
 		p->pValue = pLocalDesc;
 	}
 
-	Variant* Find(Variant* key) const;		//same with Bucket
+	inline Variant* Find(Variant* key) const
+	{
+		const unsigned int capacity = ((Variant*)pValue)->nCap;
+		unsigned int index = key->GetHash() % capacity;
 
-	inline void Insert(Variant* key, Variant* val, Bucket* bucket)
+		Variant* bucket = (Variant*)Get(index)->pValue;
+
+		while (bucket)
+		{
+			if (Equal(key, bucket + KEY))
+			{
+				return bucket + VALUE;
+			}
+
+			bucket = (Variant*)(bucket + NEXT)->pValue;
+		}
+
+		throw ex_keyMissing(key);
+	}
+
+	inline void Insert(Variant* key, Variant* val, Variant* bucket)
 	{
 		const unsigned int capacity = ((Variant*)pValue)->nCap;
 		unsigned int index = key->GetHash() % capacity;
@@ -145,8 +166,8 @@ struct Variant
 		Variant* entry = (Variant*)Get(index);
 		//if entry->lValue more then trashhold constante, hash would be resized
 
-		bucket->key = *key;
-		bucket->value = *val;
+		*(bucket + KEY) = *key;
+		*(bucket + VALUE) = *val;
 
 		if (entry->pValue == nullptr)
 		{
@@ -155,7 +176,7 @@ struct Variant
 		}
 		else
 		{
-			bucket->next.pValue = entry->pValue;
+			(bucket + NEXT)->pValue = entry->pValue;
 			++entry->lValue;
 			entry->pValue = bucket;
 		}
@@ -170,7 +191,30 @@ struct Variant
 		--nLength;
 	}
 
-	void Erase(Variant* key); //same with Bucket
+	void Erase(Variant* key)
+	{
+		const unsigned int cap = ((Variant*)pValue)->nCap;
+		unsigned int index = key->GetHash() % cap;
+		Variant* pEntry = Get(index);
+		Variant* prev = pEntry;
+		Variant* pBucket = (Variant*)pEntry->pValue;
+
+		while (pBucket)
+		{
+			if (Equal(key, pBucket + KEY))
+			{
+				--nLength;
+				--pEntry->nCap;
+				pBucket = (Variant*)(pBucket + NEXT)->pValue;
+				prev->pValue = pBucket;
+				return;
+			}
+			prev = pBucket + NEXT;
+			pBucket = (Variant*)(pBucket + NEXT)->pValue;
+		}
+
+		throw ex_keyMissing(key);
+	}
 
 	inline void Concat(Variant* op)
 	{
@@ -315,13 +359,6 @@ struct Variant
 	};
 
 	void* pValue;
-};
-
-struct Bucket
-{
-	Variant key;
-	Variant value;
-	Variant next;
 };
 
 const unsigned int c_primes[] = {

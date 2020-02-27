@@ -1,6 +1,5 @@
 CALL mark
-HALT
+PUSH 0
+ASSERT
 mark:
-PUSH 'DONE'
-PRINT
 HALT

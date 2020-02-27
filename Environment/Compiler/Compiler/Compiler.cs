@@ -55,6 +55,7 @@ namespace Compiler
             DUP,
             NARG,
             SARG,
+            ASSERT,
         };
 
         public enum VarType : ushort
@@ -83,7 +84,7 @@ namespace Compiler
         internal class CException : Exception
         {
             public CException(string messege)
-                : base(i.ToString() + ": " + messege + "\n")
+                : base(byteCode.Count.ToString() + ": " + messege + "\n")
             {}
         }
 
@@ -125,7 +126,7 @@ namespace Compiler
 
             ClearSpaces();
 
-            if (Char.IsDigit(program[i]))
+            if (Char.IsDigit(program[i]) || program[i] == '-')
             {
                 string op = "";
                 op += program[i++];
@@ -192,9 +193,9 @@ namespace Compiler
             }
             else
             {
-                string op = Split();
-                if (op == "NULL")
+                if (program.Substring(i, 4) == "NULL")
                 {
+                    i += 4;
                     List<byte> bytes = new List<byte>();
                     bytes.AddRange(BitConverter.GetBytes(c_null));
                     bytes.AddRange(BitConverter.GetBytes((ushort)VarType.NIL));
@@ -441,6 +442,9 @@ namespace Compiler
                             string op = Split();
                             AddByte(byte.Parse(op));
                         }
+                        break;
+                    case "ASSERT":
+                        AddByte((byte)ByteCommand.ASSERT);
                         break;
                     default:
                         if (command[command.Length - 1] == ':')

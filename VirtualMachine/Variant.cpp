@@ -1,10 +1,6 @@
 #include "Variant.h"
 #include "VirtualMachine.h"
 
-Variant::~Variant()
-{
-}
-
 const string Variant::ToString() const
 {
 	if (usNull != c_null)
@@ -56,7 +52,7 @@ const string Variant::ToString() const
 		else if (usType == VarType::DICT)
 		{
 			unsigned int length = nLength;
-			Bucket* bucket;
+			Variant* bucket;
 			while (true)
 			{
 				const unsigned int capacity = pLocalDesc->nCap;
@@ -65,11 +61,11 @@ const string Variant::ToString() const
 				{
 					if (pArr->pValue)
 					{
-						bucket = (Bucket*)pArr->pValue;
+						bucket = (Variant*)pArr->pValue;
 						while (bucket)
 						{
-							str = str + bucket->key.ToString() + " : " + bucket->value.ToString();
-							bucket = (Bucket*)bucket->next.pValue;
+							str = str + (bucket + KEY)->ToString() + " : " + (bucket + VALUE)->ToString();
+							bucket = (Variant*)(bucket + NEXT)->pValue;
 							if (--length == 0)
 							{
 								str += '}';
@@ -173,8 +169,8 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 			}
 			else if (type == VarType::DICT)
 			{
-				Bucket* bucket1 = nullptr;
-				Bucket* bucket2 = nullptr;
+				Variant* bucket1 = nullptr;
+				Variant* bucket2 = nullptr;
 
 				for (unsigned int i = 0; i < op1->nLength; ++i)
 				{
@@ -189,7 +185,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 
 						if (pArr1->pValue)
 						{
-							bucket1 = (Bucket*)pArr1->pValue;
+							bucket1 = (Variant*)pArr1->pValue;
 						}
 						else
 						{
@@ -206,9 +202,9 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 							stop2 = pArr2 + pLocalDesc2->nCap;
 						}
 
-						if (pArr2->lValue > 0)
+						if (pArr2->pValue)
 						{
-							bucket2 = (Bucket*)pArr2->pValue;
+							bucket2 = (Variant*)pArr2->pValue;
 						}
 						else
 						{
@@ -216,13 +212,13 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 						}
 					}
 
-					if (!Equal(&bucket1->key, &bucket2->key) || !Equal(&bucket1->value, &bucket2->value))
+					if (!Equal(bucket1 + KEY, bucket2 + KEY) || !Equal(bucket1 + VALUE, bucket2 + VALUE))
 					{
 						return false;
 					}
 
-					bucket1 = (Bucket*)bucket1->next.pValue;
-					bucket2 = (Bucket*)bucket2->next.pValue;
+					bucket1 = (Variant*)(bucket1 + NEXT)->pValue;
+					bucket2 = (Variant*)(bucket2 + NEXT)->pValue;
 				}
 			}
 
@@ -233,51 +229,6 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	{
 		return op1->dValue == op2->dValue;
 	}
-}
-
-Variant* Variant::Find(Variant* key) const
-{
-	const unsigned int capacity = ((Variant*)pValue)->nCap;
-	unsigned int index = key->GetHash() % capacity;
-
-	Bucket* bucket = (Bucket*)Get(index)->pValue;
-
-	while (bucket)
-	{
-		if (Equal(key, &bucket->key))
-		{
-			return &bucket->value;
-		}
-
-		bucket = (Bucket*)bucket->next.pValue;
-	}
-
-	throw ex_keyMissing(key);
-}
-
-void Variant::Erase(Variant* key)
-{
-	const unsigned int cap = ((Variant*)pValue)->nCap;
-	unsigned int index = key->GetHash() % cap;
-	Variant* pEntry = Get(index);
-	Variant* prev = pEntry;
-	Bucket* pBucket = (Bucket*)pEntry->pValue;
-
-	while (pBucket)
-	{
-		if (Equal(key, &pBucket->key))
-		{
-			--nLength;
-			--pEntry->nCap;
-			pBucket = (Bucket*)pBucket->next.pValue;
-			prev->pValue = pBucket;
-			return;
-		}
-		prev = &pBucket->next;
-		pBucket = (Bucket*)pBucket->next.pValue;
-	}
-
-	throw ex_keyMissing(key);
 }
 
 const unsigned long Variant::GetHash() const
@@ -322,7 +273,7 @@ const unsigned long Variant::GetHash() const
 			else if (usType == VarType::DICT)
 			{
 				unsigned int length = nLength;
-				Bucket* bucket;
+				Variant* bucket;
 				while (true)
 				{
 					const unsigned int capacity = pLocalDesc->nCap;
@@ -331,11 +282,11 @@ const unsigned long Variant::GetHash() const
 					{
 						if (pArr->pValue)
 						{
-							bucket = (Bucket*)pArr->pValue;
+							bucket = (Variant*)pArr->pValue;
 							while (bucket)
 							{
-								hash ^= (bucket->key.GetHash() - bucket->value.GetHash());
-								bucket = (Bucket*)bucket->next.pValue;
+								hash ^= ((bucket + KEY)->GetHash() - (bucket + VALUE)->GetHash());
+								bucket = (Variant*)(bucket + NEXT)->pValue;
 								if (--length == 0)
 								{
 									return hash;

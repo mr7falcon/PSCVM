@@ -1,7 +1,6 @@
 PUSH 0
 JZ mark
-HALT
+PUSH 0
+ASSERT
 mark:
-PUSH 'DONE'
-PRINT
 HALT
