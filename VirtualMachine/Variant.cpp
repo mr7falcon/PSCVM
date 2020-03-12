@@ -304,7 +304,7 @@ const unsigned long Variant::GetHash() const
 	}
 	else
 	{
-		hash = lValue;
+		hash = (long)dValue;
 	}
 
 	return hash;

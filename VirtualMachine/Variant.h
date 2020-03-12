@@ -56,6 +56,7 @@ struct Variant
 
 	static const unsigned short c_null = 0x7FF0;
 	static const char c_capInc = 2;
+	static const char c_maxListSize = 4;
 
 	inline Variant()
 		: pValue(nullptr),
@@ -158,17 +159,8 @@ struct Variant
 		throw ex_keyMissing(key);
 	}
 
-	inline void Insert(Variant* key, Variant* val, Variant* bucket)
+	inline void Insert(Variant* bucket, Variant* entry)
 	{
-		const unsigned int capacity = ((Variant*)pValue)->nCap;
-		unsigned int index = key->GetHash() % capacity;
-
-		Variant* entry = (Variant*)Get(index);
-		//if entry->lValue more then trashhold constante, hash would be resized
-
-		*(bucket + KEY) = *key;
-		*(bucket + VALUE) = *val;
-
 		if (entry->pValue == nullptr)
 		{
 			entry->lValue = 1;
@@ -180,8 +172,55 @@ struct Variant
 			++entry->lValue;
 			entry->pValue = bucket;
 		}
+	}
 
-		++nLength;
+	inline void DictResize(Variant* pNewDesc)
+	{
+		PushBack(pNewDesc++);
+
+		Variant* pGlobalDesc = (Variant*)pValue;
+		const unsigned int cap = pGlobalDesc->nCap;
+		Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
+		Variant* pVar = pLocalDesc + 1;
+		const Variant* pStop = pVar + pLocalDesc->nCap;
+
+		for (unsigned int i = 0; i < cap; ++i)
+		{
+			if (pVar == pStop)
+			{
+				pLocalDesc = (Variant*)pLocalDesc->pValue;
+				pVar = pLocalDesc + 1;
+				pStop = pVar + pLocalDesc->nCap;
+			}
+
+			if (pVar->pValue)
+			{
+				Variant* prev = pVar;
+				Variant* pBucket = (Variant*)pVar->pValue;
+				while (pBucket)
+				{
+					Variant* next = pBucket + NEXT;
+					if (((next->lValue--) & 1) == 1)
+					{
+						prev->pValue = next->pValue;
+						next->pValue = nullptr;
+						Variant* pEntry = pNewDesc + i;
+						Insert(pBucket, pEntry);
+						--pVar->lValue;
+						pBucket = (Variant*)prev->pValue;
+					}
+					else
+					{
+						prev = next;
+						pBucket = (Variant*)next->pValue;
+					}
+				}
+			}
+
+			++pVar;
+		}
+
+		pGlobalDesc->nCap += cap;
 	}
 
 	const unsigned long GetHash() const;
@@ -361,23 +400,12 @@ struct Variant
 	void* pValue;
 };
 
-const unsigned int c_primes[] = {
-			3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919,
-			1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
-			17519, 21023, 25229, 30293, 36353, 43627, 52361, 62851, 75431, 90523, 108631, 130363, 156437,
-			187751, 225307, 270371, 324449, 389357, 467237, 560689, 672827, 807403, 968897, 1162687, 1395263,
-			1674319, 2009191, 2411033, 2893249, 3471899, 4166287, 4999559, 5999471, 7199369 };
-
-inline const unsigned int GetPrime(const unsigned int num) noexcept
+inline const unsigned int DictSizGen(const unsigned int num) noexcept
 {
-	for (int i = 0; i < 72; ++i)
+	unsigned int res = 1;
+	while (num > res)
 	{
-		const unsigned int prime = *(c_primes + i);
-		if (prime > num)
-		{
-			return prime;
-		}
+		res <<= 1;
 	}
-
-	return UINT_MAX;
+	return res;
 }

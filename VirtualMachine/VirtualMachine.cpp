@@ -262,7 +262,7 @@ Variant VirtualMachine::FromBytes()
 		else if (var.usType == VarType::DICT)
 		{
 			const unsigned int length = var.nLength;
-			const unsigned int cap = GetPrime(length);
+			const unsigned int cap = DictSizGen(length);
 			Variant* pGlobalDesc = VirtualMachine::HeapAlloc(cap);
 			var.pValue = pGlobalDesc;
 			Variant* pBucketDesc = VirtualMachine::HeapAllocStructArr(length);
@@ -274,11 +274,13 @@ Variant VirtualMachine::FromBytes()
 				for (Variant* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; pBucket += BUCKET_SIZE)
 				{
 					Variant key = FromBytes();
-					const unsigned int index = key.GetHash() % cap;
+					const ldiv_t div = std::div(key.GetHash(), (long)cap);
+					const unsigned int index = div.rem;
 
 					Variant* cell = var.Get(index);
 					*(pBucket + KEY) = key;
 					*(pBucket + VALUE) = FromBytes();
+					(pBucket + NEXT)->lValue = div.quot;
 
 					if (cell->pValue == nullptr)
 					{
@@ -562,7 +564,24 @@ void VirtualMachine::Run(byte* program)
 				const clock_t tStart = clock();
 #endif
 				Variant* bucket = VirtualMachine::HeapAllocStruct();
-				(m_pStack + m_nCapacity - offset)->Insert(key, m_sp++, bucket);
+				Variant* var = m_pStack + m_nCapacity - offset;
+
+				const unsigned int capacity = ((Variant*)var->pValue)->nCap;
+				const ldiv_t div = std::div(key->GetHash(), (long)capacity);
+				const unsigned int index = div.rem;
+				Variant* entry = (Variant*)var->Get(index);
+
+				*(bucket + KEY) = *key;
+				*(bucket + VALUE) = *(m_sp++);
+				(bucket + NEXT)->lValue = div.quot;
+				var->Insert(bucket, entry);
+				++var->nLength;
+
+				if (entry->lValue > Variant::c_maxListSize)
+				{
+					Variant* pLocalDesc = HeapAlloc(capacity, true);
+					var->DictResize(pLocalDesc);
+				}
 
 #ifdef _DEBUG
 				const clock_t tEnd = clock();
@@ -645,7 +664,7 @@ void VirtualMachine::Run(byte* program)
 				const clock_t tStart = clock();
 #endif
 
-				const unsigned int capacity = GetPrime(len + (len >> Variant::c_capInc));
+				const unsigned int capacity = DictSizGen(len);
 				Variant* dict = VirtualMachine::HeapAlloc(capacity);
 				*m_sp = Variant(dict, 0, VarType::DICT);
 
