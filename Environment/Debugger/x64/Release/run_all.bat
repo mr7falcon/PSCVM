@@ -24,3 +24,7 @@ Debugger.exe -v ../../../Tests/Byte/ret.bpsc
 Debugger.exe -v ../../../Tests/Byte/sarg.bpsc 'STRING'
 Debugger.exe -v ../../../Tests/Byte/store.bpsc
 Debugger.exe -v ../../../Tests/Byte/sub.bpsc
+Debugger.exe -v ../../../Tests/Byte/band.bpsc
+Debugger.exe -v ../../../Tests/Byte/neg.bpsc
+Debugger.exe -v ../../../Tests/Byte/shl.bpsc
+Debugger.exe -v ../../../Tests/Byte/len.bpsc

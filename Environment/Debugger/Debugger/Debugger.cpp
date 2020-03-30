@@ -39,7 +39,7 @@ byte* ArgToByte(char* arg)
 	if (*arg == '\'')
 	{
 		const char* sStart = arg + 1;
-		const unsigned short len = strchr(sStart, '\'') - sStart;
+		const unsigned int len = (unsigned int)(strchr(sStart, '\'') - sStart);
 		res = new byte[len + 1];
 		memcpy(res, sStart, len);
 		res[len] = '\0';

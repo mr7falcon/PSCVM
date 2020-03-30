@@ -57,6 +57,13 @@ enum ByteCommand : byte
 	NARG,
 	SARG,
 	ASSERT,
+	XOR,
+	NEG,
+	SHL,
+	SHR,
+	BOR,
+	BAND,
+	LEN,
 };
 
 class VirtualMachine

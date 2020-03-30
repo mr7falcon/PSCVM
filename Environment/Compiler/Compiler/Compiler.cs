@@ -56,6 +56,13 @@ namespace Compiler
             NARG,
             SARG,
             ASSERT,
+            XOR,
+            NEG,
+            SHL,
+            SHR,
+            BOR,
+            BAND,
+            LEN,
         };
 
         public enum VarType : ushort
@@ -344,8 +351,27 @@ namespace Compiler
                     case "OR":
                         AddByte((byte)ByteCommand.OR);
                         break;
+                    case "BOR":
+                        AddByte((byte)ByteCommand.BOR);
+                        break;
+                    case "BAND":
+                        AddByte((byte)ByteCommand.BAND);
+                        break;
                     case "NOT":
                         AddByte((byte)ByteCommand.NOT);
+                        break;
+                    case "XOR":
+                        AddByte((byte)ByteCommand.XOR);
+                        break;
+                    case "NEG":
+                        AddByte((byte)ByteCommand.NEG);
+                        AddInt();
+                        break;
+                    case "SHL":
+                        AddByte((byte)ByteCommand.SHL);
+                        break;
+                    case "SHR":
+                        AddByte((byte)ByteCommand.SHR);
                         break;
                     case "LT":
                         AddByte((byte)ByteCommand.LT);
@@ -445,6 +471,9 @@ namespace Compiler
                         break;
                     case "ASSERT":
                         AddByte((byte)ByteCommand.ASSERT);
+                        break;
+                    case "LEN":
+                        AddByte((byte)ByteCommand.LEN);
                         break;
                     default:
                         if (command[command.Length - 1] == ':')

@@ -381,7 +381,7 @@ struct Variant
 	union
 	{
 		double dValue;
-		long lValue;
+		unsigned long lValue;
 
 		struct
 		{

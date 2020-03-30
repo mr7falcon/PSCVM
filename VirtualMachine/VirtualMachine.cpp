@@ -274,13 +274,13 @@ Variant VirtualMachine::FromBytes()
 				for (Variant* pBucket = pBucketArr; pBucket < pBucketArr + bucketCap; pBucket += BUCKET_SIZE)
 				{
 					Variant key = FromBytes();
-					const ldiv_t div = std::div(key.GetHash(), (long)cap);
-					const unsigned int index = div.rem;
+					const lldiv_t div = std::div((long long)key.GetHash(), (long long)cap);
+					const unsigned int index = (unsigned int)div.rem;
 
 					Variant* cell = var.Get(index);
 					*(pBucket + KEY) = key;
 					*(pBucket + VALUE) = FromBytes();
-					(pBucket + NEXT)->lValue = div.quot;
+					(pBucket + NEXT)->lValue = (unsigned long)div.quot;
 
 					if (cell->pValue == nullptr)
 					{
@@ -567,13 +567,13 @@ void VirtualMachine::Run(byte* program)
 				Variant* var = m_pStack + m_nCapacity - offset;
 
 				const unsigned int capacity = ((Variant*)var->pValue)->nCap;
-				const ldiv_t div = std::div(key->GetHash(), (long)capacity);
-				const unsigned int index = div.rem;
+				const lldiv_t div = std::div((long long)key->GetHash(), (long long)capacity);
+				const unsigned int index = (unsigned int)div.rem;
 				Variant* entry = (Variant*)var->Get(index);
 
 				*(bucket + KEY) = *key;
 				*(bucket + VALUE) = *(m_sp++);
-				(bucket + NEXT)->lValue = div.quot;
+				(bucket + NEXT)->lValue = (unsigned long)div.quot;
 				var->Insert(bucket, entry);
 				++var->nLength;
 
@@ -821,6 +821,23 @@ void VirtualMachine::Run(byte* program)
 				--var->dValue;
 			}
 			break;
+			case ByteCommand::NEG:
+			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
+#ifdef _DEBUG
+				Log("NEG " + std::to_string(offset));
+#endif
+
+				Variant* var = (m_pStack + m_nCapacity - offset);
+				if (var->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)var->usType);
+				}
+				var->dValue = -var->dValue;
+			}
+			break;
 			case ByteCommand::MULT:
 			{
 				Variant* op2 = m_sp++;
@@ -877,7 +894,7 @@ void VirtualMachine::Run(byte* program)
 
 				if (op2->dValue != 0.0)
 				{
-					op1->dValue = (int)op1->dValue % (int)op2->dValue;
+					op1->dValue = (long)op1->dValue % (long)op2->dValue;
 				}
 				else
 				{
@@ -898,8 +915,7 @@ void VirtualMachine::Run(byte* program)
 				{
 					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
 				}
-				op1->dValue = (op1->dValue != 0.0 && op2->dValue != 0.0
-					&& op1->usNull != Variant::c_null && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
+				op1->dValue = (long)op1->dValue && (long)op2->dValue;
 			}
 			break;
 			case ByteCommand::OR:
@@ -915,8 +931,89 @@ void VirtualMachine::Run(byte* program)
 				{
 					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
 				}
-				op1->dValue = (op1->dValue != 0.0 && op1->usNull != Variant::c_null
-					|| op2->dValue != 0.0 && op2->usNull != Variant::c_null) ? 1.0 : 0.0;
+				op1->dValue = (long)op1->dValue || (long)op2->dValue;
+			}
+			break;
+			case ByteCommand::XOR:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("XOR " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = (long)op1->dValue ^ (long)op2->dValue;
+			}
+			break;
+			case ByteCommand::BOR:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("BOR " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = (long)op1->dValue | (long)op2->dValue;
+			}
+			break;
+			case ByteCommand::BAND:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("BAND " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+				op1->dValue = (long)op1->dValue & (long)op2->dValue;
+			}
+			break;
+			case ByteCommand::SHL:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("SHL " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+
+				op1->dValue = (long)op1->dValue << (long)op2->dValue;
+			}
+			break;
+			case ByteCommand::SHR:
+			{
+				Variant* op2 = m_sp++;
+				Variant* op1 = m_sp;
+
+#ifdef _DEBUG
+				Log("SHR " + op1->ToString() + " " + op2->ToString());
+#endif
+
+				if (op1->usNull == Variant::c_null || op2->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType(op1->usNull == Variant::c_null ? (VarType)op1->usType : (VarType)op2->usType);
+				}
+
+				op1->dValue = (long)op1->dValue >> (long)op2->dValue;
 			}
 			break;
 			case ByteCommand::NOT:
@@ -1186,6 +1283,16 @@ void VirtualMachine::Run(byte* program)
 				{
 					throw std::exception("FAIL\n");
 				}
+			}
+			break;
+			case ByteCommand::LEN:
+			{
+#ifdef _DEBUG
+				Log("DUP " + m_sp->ToString());
+#endif
+
+				m_sp->Free();
+				m_sp->dValue = m_sp->nLength;
 			}
 			break;
 			default:
