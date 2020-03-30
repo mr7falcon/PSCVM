@@ -116,6 +116,14 @@ struct Variant
 		}
 	}
 
+	inline void CheckType(VarType expected) const
+	{
+		if (usNull != c_null || usType != expected)
+		{
+			throw ex_wrongType((VarType)usType);
+		}
+	}
+
 	inline Variant* Get(const unsigned int i) const
 	{
 		Variant* p = (Variant*)((Variant*)pValue)->pValue;
@@ -350,9 +358,88 @@ struct Variant
 			}
 		}
 
-		Variant var = Variant(pGlobalDesc2, nLength, VarType::ARR);
-		Free();
-		return var;
+		return Variant(pGlobalDesc2, nLength, VarType::ARR);
+	}
+
+	inline void DictToArr(Variant* pGlobalDesc2) const
+	{
+		static const unsigned short doubVariantSize = sizeof(Variant) << 1;
+
+		Variant* pGlobalDesc1 = (Variant*)pValue;
+		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
+		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
+		Variant* pArr1 = pLocalDesc1 + 1;
+		Variant* pArr2 = pLocalDesc2 + 1;
+		Variant* stop1 = pArr1 + pLocalDesc1->nCap;
+		Variant* stop2 = pArr2 + pLocalDesc2->nCap;
+		Variant* bucket;
+		unsigned int len = nLength;
+
+		while (true)
+		{
+			for (; pArr1 <= stop1; ++pArr1)
+			{
+				if (pArr1->pValue)
+				{
+					bucket = (Variant*)pArr1->pValue;
+					while (bucket)
+					{
+						*pArr2++ = *(bucket + KEY);
+						if (pArr2 == stop2)
+						{
+							pLocalDesc2 = (Variant*)pLocalDesc1->pValue;
+							pArr2 = pLocalDesc2 + 1;
+							stop2 = pArr2 + pLocalDesc2->nCap;
+						}
+
+						*pArr2++ = *(bucket + VALUE);
+
+						if (--len == 0)
+						{
+							return;
+						}
+						
+						if (pArr2 == stop2)
+						{
+							pLocalDesc2 = (Variant*)pLocalDesc1->pValue;
+							pArr2 = pLocalDesc2 + 1;
+							stop2 = pArr2 + pLocalDesc2->nCap;
+						}
+
+						bucket = (Variant*)(bucket + NEXT)->pValue;
+					}
+				}
+			}
+
+			pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
+			pArr1 = pLocalDesc1 + 1;
+			stop1 = pArr1 + pLocalDesc1->nCap;
+		}
+	}
+
+	inline bool Contains(Variant* key) const
+	{
+		if (usNull != c_null || usType != VarType::DICT)
+		{
+			throw ex_wrongType((VarType)usType);
+		}
+
+		const unsigned int capacity = ((Variant*)pValue)->nCap;
+		unsigned int index = key->GetHash() % capacity;
+
+		Variant* bucket = (Variant*)Get(index)->pValue;
+
+		while (bucket)
+		{
+			if (Equal(key, bucket + KEY))
+			{
+				return true;
+			}
+
+			bucket = (Variant*)(bucket + NEXT)->pValue;
+		}
+
+		return false;
 	}
 
 	const string ToString() const;

@@ -473,33 +473,31 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 				Variant* arr = m_pStack + m_nCapacity - offset;
+				arr->CheckType(VarType::ARR);
 
-				if (arr->usNull == Variant::c_null && arr->usType == VarType::ARR)
+				Variant* pGlobalDesc = (Variant*)arr->pValue;
+				unsigned int cap = pGlobalDesc->nCap;
+				const unsigned int len = arr->nLength;
+				if (len == cap)
 				{
-					Variant* pGlobalDesc = (Variant*)arr->pValue;
-					unsigned int cap = pGlobalDesc->nCap;
-					const unsigned int len = arr->nLength;
-					if (len == cap)
-					{
-						unsigned int inc = cap >> Variant::c_capInc;
+					unsigned int inc = cap >> Variant::c_capInc;
 
-						if (inc == 0)
-						{
-							inc = 1;
-						}
-
-						Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc, true);
-						*(pLocalDesc + 1) = *(m_sp++);
-						arr->PushBack(pLocalDesc);
-						pGlobalDesc->nCap += inc;
-					}
-					else
+					if (inc == 0)
 					{
-						*(arr->Get(len)) = *(m_sp++);
+						inc = 1;
 					}
 
-					++arr->nLength;
+					Variant* pLocalDesc = VirtualMachine::HeapAlloc(inc, true);
+					*(pLocalDesc + 1) = *(m_sp++);
+					arr->PushBack(pLocalDesc);
+					pGlobalDesc->nCap += inc;
 				}
+				else
+				{
+					*(arr->Get(len)) = *(m_sp++);
+				}
+
+				++arr->nLength;
 
 #ifdef _DEBUG
 				const clock_t tEnd = clock();
@@ -542,7 +540,9 @@ void VirtualMachine::Run(byte* program)
 				const clock_t tStart = clock();
 #endif
 
-				* ((m_pStack + m_nCapacity - offset)->Find(key)) = *(m_sp++);
+				Variant* dict = m_pStack + m_nCapacity - offset;
+				dict->CheckType(VarType::DICT);
+				*(dict->Find(key)) = *(m_sp++);
 				key->Free();
 
 #ifdef _DEBUG
@@ -563,8 +563,9 @@ void VirtualMachine::Run(byte* program)
 
 				const clock_t tStart = clock();
 #endif
-				Variant* bucket = VirtualMachine::HeapAllocStruct();
 				Variant* var = m_pStack + m_nCapacity - offset;
+				var->CheckType(VarType::DICT);
+				Variant* bucket = VirtualMachine::HeapAllocStruct();
 
 				const unsigned int capacity = ((Variant*)var->pValue)->nCap;
 				const lldiv_t div = std::div((long long)key->GetHash(), (long long)capacity);
@@ -705,7 +706,9 @@ void VirtualMachine::Run(byte* program)
 				const clock_t tStart = clock();
 #endif
 
-				(m_pStack + m_nCapacity - offset)->PopBack();
+				Variant* arr = m_pStack + m_nCapacity - offset;
+				arr->CheckType(VarType::ARR);
+				arr->PopBack();
 
 #ifdef _DEBUG
 				const clock_t tEnd = clock();
@@ -724,7 +727,9 @@ void VirtualMachine::Run(byte* program)
 				const clock_t tStart = clock();
 #endif
 
-				(m_pStack + m_nCapacity - offset)->Erase(m_sp);
+				Variant* dict = m_pStack + m_nCapacity - offset;
+				dict->CheckType(VarType::DICT);
+				dict->Erase(m_sp);
 				(m_sp++)->Free();
 
 #ifdef _DEBUG
@@ -1287,12 +1292,76 @@ void VirtualMachine::Run(byte* program)
 			break;
 			case ByteCommand::LEN:
 			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
 #ifdef _DEBUG
-				Log("DUP " + m_sp->ToString());
+				Log("LEN " + std::to_string(offset));
+				const clock_t tStart = clock();
 #endif
 
+				Variant* var = m_pStack + m_nCapacity - offset;
+
+				if (m_sp - 1 == m_bp)
+				{
+					Resize();
+				}
+				(--m_sp)->dValue = var->nLength;
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::DARR:
+			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
+#ifdef _DEBUG
+				Log("DARR " + std::to_string(offset));
+				const clock_t tStart = clock();
+#endif
+
+				Variant* dict = m_pStack + m_nCapacity - offset;
+				dict->CheckType(VarType::DICT);
+				const unsigned int arrLen = dict->nLength << 1;
+				Variant* pGlobalDesc = HeapAlloc(arrLen);
+				dict->DictToArr(pGlobalDesc);
+
+				if (m_sp - 1 == m_bp)
+				{
+					Resize();
+				}
+				*(--m_sp) = Variant(pGlobalDesc, arrLen, VarType::ARR);
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case ByteCommand::DCONT:
+			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
+#ifdef _DEBUG
+				Log("DCONT " + std::to_string(offset) + " " + m_sp->ToString());
+				const clock_t tStart = clock();
+#endif
+
+				Variant* dict = m_pStack + m_nCapacity - offset;
+				dict->CheckType(VarType::DICT);
+				bool res = dict->Contains(m_sp);
 				m_sp->Free();
-				m_sp->dValue = m_sp->nLength;
+				m_sp->dValue = res;
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
 			}
 			break;
 			default:

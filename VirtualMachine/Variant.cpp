@@ -55,8 +55,6 @@ const string Variant::ToString() const
 			Variant* bucket;
 			while (true)
 			{
-				const unsigned int capacity = pLocalDesc->nCap;
-
 				for (; pArr <= stop; ++pArr)
 				{
 					if (pArr->pValue)

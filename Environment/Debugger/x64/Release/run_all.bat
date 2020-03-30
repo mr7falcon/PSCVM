@@ -28,3 +28,5 @@ Debugger.exe -v ../../../Tests/Byte/band.bpsc
 Debugger.exe -v ../../../Tests/Byte/neg.bpsc
 Debugger.exe -v ../../../Tests/Byte/shl.bpsc
 Debugger.exe -v ../../../Tests/Byte/len.bpsc
+Debugger.exe -v ../../../Tests/Byte/darr.bpsc
+Debugger.exe -v ../../../Tests/Byte/dcont.bpsc

@@ -63,6 +63,8 @@ namespace Compiler
             BOR,
             BAND,
             LEN,
+            DARR,
+            DCONT,
         };
 
         public enum VarType : ushort
@@ -474,6 +476,14 @@ namespace Compiler
                         break;
                     case "LEN":
                         AddByte((byte)ByteCommand.LEN);
+                        break;
+                    case "DARR":
+                        AddByte((byte)ByteCommand.DARR);
+                        AddInt();
+                        break;
+                    case "DCONT":
+                        AddByte((byte)ByteCommand.DCONT);
+                        AddInt();
                         break;
                     default:
                         if (command[command.Length - 1] == ':')

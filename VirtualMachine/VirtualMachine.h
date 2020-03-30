@@ -64,6 +64,8 @@ enum ByteCommand : byte
 	BOR,
 	BAND,
 	LEN,
+	DARR,
+	DCONT,
 };
 
 class VirtualMachine
@@ -134,6 +136,20 @@ public:
 		while (iter)
 		{
 			HeapChunk* next = iter->pNext;
+
+#ifdef _DEBUG
+			if (!next)
+			{
+				const unsigned short diff = (unsigned short)(m_pCurrentSlot - iter->vData);
+				g_memVar -= diff;
+			}
+			else
+			{
+				g_memVar -= c_nChunkCapacity;
+			}
+			--g_memChunk;
+#endif
+
 			delete(iter);
 			iter = next;
 		}
