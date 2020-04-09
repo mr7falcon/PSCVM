@@ -476,6 +476,7 @@ namespace Compiler
                         break;
                     case "LEN":
                         AddByte((byte)ByteCommand.LEN);
+                        AddInt();
                         break;
                     case "DARR":
                         AddByte((byte)ByteCommand.DARR);

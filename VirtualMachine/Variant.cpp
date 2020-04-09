@@ -1,7 +1,7 @@
 #include "Variant.h"
 #include "VirtualMachine.h"
 
-const string Variant::ToString() const
+const string Variant::ToString()
 {
 	if (usNull != c_null)
 	{
@@ -22,66 +22,30 @@ const string Variant::ToString() const
 	{
 		string str = "{";
 		
-		Variant* pGlobalDesc = (Variant*)pValue;
-		Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
-		Variant* pArr = pLocalDesc + 1;
-		Variant* stop = pArr + pLocalDesc->nCap;
-
 		if (usType == VarType::ARR)
 		{
-			const unsigned int length = nLength - 1;
-
-			str += (pArr++)->ToString();
-
-			for (unsigned int i = 0; i < length; ++i)
+			auto f = [&](Variant* elem)
 			{
-				if (pArr == stop)
-				{
-					pLocalDesc = (Variant*)pLocalDesc->pValue;
-					pArr = pLocalDesc + 1;
-					stop = pArr + pLocalDesc->nCap;
-				}
+				str = str + " " + elem->ToString() + " |";
+			};
 
-				str = str + " | " + pArr->ToString();
-				++pArr;
-			}
+			ForEach(f);
 
-			str += '}';
-			return str;
+			str[str.length() - 1] = '}';
 		}
 		else if (usType == VarType::DICT)
 		{
-			unsigned int length = nLength;
-			Variant* bucket;
-			while (true)
+			auto f = [&](Variant* elem)
 			{
-				for (; pArr <= stop; ++pArr)
-				{
-					if (pArr->pValue)
-					{
-						bucket = (Variant*)pArr->pValue;
-						while (bucket)
-						{
-							str = str + (bucket + KEY)->ToString() + " : " + (bucket + VALUE)->ToString();
-							bucket = (Variant*)(bucket + NEXT)->pValue;
-							if (--length == 0)
-							{
-								str += '}';
-								return str;
-							}
-							else
-							{
-								str += " | ";
-							}
-						}
-					}
-				}
+				str = str + " " + (elem + KEY)->ToString() + " : " + (elem + VALUE)->ToString() + " |";
+			};
 
-				pLocalDesc = (Variant*)pLocalDesc->pValue;
-				pArr = pLocalDesc + 1;
-				stop = pArr + pLocalDesc->nCap;
-			}
+			ForEachBucket(f);
+
+			str[str.length() - 1] = '}';
 		}
+
+		return str;
 	}
 
 	return "";
@@ -229,7 +193,7 @@ bool Variant::Equal(Variant* op1, Variant* op2)
 	}
 }
 
-const unsigned long Variant::GetHash() const
+const unsigned long Variant::GetHash()
 {
 	unsigned long hash = 0;
 
@@ -246,58 +210,23 @@ const unsigned long Variant::GetHash() const
 				p_pow *= p;
 			}
 		}
-		else
+		else if (usType == VarType::ARR)
 		{
-			Variant* pGlobalDesc = (Variant*)pValue;
-			Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
-			Variant* pArr = pLocalDesc + 1;
-			Variant* stop = pArr + pLocalDesc->nCap;
-
-			if (usType == VarType::ARR)
+			auto f = [&](Variant* elem)
 			{
-				for (unsigned int i = 0; i < nLength; ++i)
-				{
-					if (pArr == stop)
-					{
-						pLocalDesc = (Variant*)pLocalDesc->pValue;
-						pArr = pLocalDesc + 1;
-						stop = pArr + pLocalDesc->nCap;
-					}
+				hash ^= elem->GetHash();
+			};
 
-					hash ^= pArr->GetHash();
-					++pArr;
-				}
-			}
-			else if (usType == VarType::DICT)
+			ForEach(f);
+		}
+		else if (usType == VarType::DICT)
+		{
+			auto f = [&](Variant* elem)
 			{
-				unsigned int length = nLength;
-				Variant* bucket;
-				while (true)
-				{
-					const unsigned int capacity = pLocalDesc->nCap;
+				hash ^= ((elem + KEY)->GetHash() - (elem + VALUE)->GetHash());
+			};
 
-					for (; pArr <= stop; ++pArr)
-					{
-						if (pArr->pValue)
-						{
-							bucket = (Variant*)pArr->pValue;
-							while (bucket)
-							{
-								hash ^= ((bucket + KEY)->GetHash() - (bucket + VALUE)->GetHash());
-								bucket = (Variant*)(bucket + NEXT)->pValue;
-								if (--length == 0)
-								{
-									return hash;
-								}
-							}
-						}
-					}
-
-					pLocalDesc = (Variant*)pLocalDesc->pValue;
-					pArr = pLocalDesc + 1;
-					stop = pArr + pLocalDesc->nCap;
-				}
-			}
+			ForEachBucket(f);
 		}
 	}
 	else

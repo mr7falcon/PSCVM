@@ -22,30 +22,6 @@ inline void VirtualMachine::Resize()
 	m_nCapacity = m_nCapacity + inc;
 }
 
-void VirtualMachine::DictEntryMove(Variant* from, Variant* to, Variant** newBucket)
-{
-	Variant* pBucket;
-	Variant* pNewBucket;
-
-	if (from->pValue)
-	{
-		to->lValue = from->lValue;
-		void** prev = &to->pValue;
-		pBucket = (Variant*)from->pValue;
-
-		while (pBucket)
-		{
-			pNewBucket = *newBucket;
-			HeapMove(pBucket + KEY, pNewBucket + KEY);
-			HeapMove(pBucket + VALUE, pNewBucket + VALUE);
-			*prev = pNewBucket;
-			pBucket = (Variant*)(pBucket + NEXT)->pValue;
-			prev = &(pNewBucket + NEXT)->pValue;
-			*newBucket += BUCKET_SIZE;
-		}
-	}
-}
-
 void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 {
 	Variant* pValue = (Variant*)from->pValue;
@@ -62,87 +38,61 @@ void VirtualMachine::CheckReferences(Variant* from, Variant* to)
 		if (pValue->nReplaced == 0)
 		{
 			const unsigned int length = from->nLength;
-			Variant* pGlobDesc = pValue;
-			const unsigned int capacity = pGlobDesc->nCap;
-			Variant* iter = HeapAlloc(capacity);
-			to->pValue = iter;
-			Variant* pIterLocalDesc = (Variant*)iter->pValue;
-			iter = pIterLocalDesc + 1;
-			Variant* iterStop = iter + pIterLocalDesc->nCap;
-			Variant* pLocalDesc = (Variant*)pGlobDesc->pValue;
-			Variant* pArr = pLocalDesc + 1;
-			Variant* stop = pArr + pLocalDesc->nCap;
-
+			Variant* pGlobDesc1 = pValue;
+			const unsigned int capacity = pGlobDesc1->nCap;
+			Variant* pGlobalDesc2 = HeapAlloc(capacity);
+			to->pValue = pGlobalDesc2;
+			
 			if (type == ARR)
 			{
-				for (unsigned int i = 0; i < length; ++i)
+				auto f = [this](Variant* elem1, Variant* elem2)
 				{
-					if (pArr == stop)
-					{
-						pLocalDesc = (Variant*)pLocalDesc->pValue;
-						pArr = pLocalDesc + 1;
-						stop = pArr + pLocalDesc->nCap;
-					}
-
-					if (iter == iterStop)
-					{
-						pIterLocalDesc = (Variant*)pIterLocalDesc->pValue;
-						iter = pLocalDesc + 1;
-						iterStop = iter + pIterLocalDesc->nCap;
-					}
-
-					HeapMove(pArr, iter);
-					++pArr;
-					++iter;
-				}
+					HeapMove(elem1, elem2);
+				};
+				
+				Variant::ForEach2(from, to, f);
 			}
 			else if (type == VarType::DICT)
 			{
 				Variant* pBucketDesc = HeapAllocStructArr(length);
-				unsigned int nBucketCap = pBucketDesc->nCap;
+				unsigned long bucketCap = pBucketDesc->nCap * BUCKET_SIZE;
 				Variant* pBucketArr = (Variant*)(pBucketDesc + 1);
-				Variant* pNewBucket = pBucketArr;
+				Variant* pBucketStop = pBucketArr + bucketCap;
 				Variant* pBucket;
 
-				while (pLocalDesc)
+				auto f = [&](Variant* elem1, Variant* elem2)
 				{
-					const unsigned int capacity = pLocalDesc->nCap;
-					
-					for (; pArr <= pLocalDesc + capacity; ++pArr, ++iter)
+					if (elem1->pValue)
 					{
-						if (from->pValue)
-						{
-							to->lValue = from->lValue;
-							void** prev = &to->pValue;
-							pBucket = (Variant*)from->pValue;
+						elem2->lValue = elem1->lValue;
+						void** prev = &elem2->pValue;
+						pBucket = (Variant*)elem1->pValue;
 
-							while (pBucket)
+						while (pBucket)
+						{
+							HeapMove(pBucket + KEY, pBucketArr + VALUE);
+							HeapMove(pBucket + KEY, pBucketArr + VALUE);
+							*prev = pBucketArr;
+							pBucket = (Variant*)(pBucket + NEXT)->pValue;
+							prev = &(pBucketArr + NEXT)->pValue;
+							pBucketArr += BUCKET_SIZE;
+
+							if (pBucketArr == pBucketStop)
 							{
-								HeapMove(pBucket + KEY, pNewBucket + VALUE);
-								HeapMove(pBucket + KEY, pNewBucket + VALUE);
-								*prev = pNewBucket;
-								pBucket = (Variant*)(pBucket + NEXT)->pValue;
-								prev = &(pNewBucket + NEXT)->pValue;
-								pNewBucket += BUCKET_SIZE;
-								
-								if (++pNewBucket == pBucketArr + nBucketCap)
-								{
-									pBucketDesc = (Variant*)pBucketDesc->pValue;
-									nBucketCap = pBucketDesc->nCap;
-									pBucketArr = (Variant*)(pBucketDesc + 1);
-									pNewBucket = pBucketArr;
-								}
+								pBucketDesc = (Variant*)pBucketDesc->pValue;
+								bucketCap = pBucketDesc->nCap * BUCKET_SIZE;
+								pBucketArr = pBucketDesc + 1;
+								pBucketStop = pBucketArr + bucketCap;
 							}
 						}
 					}
+				};
 
-					pLocalDesc = (Variant*)pLocalDesc->pValue;
-					pArr = pLocalDesc + 1;
-				}
+				Variant::ForEach2(from, to, f);
 			}
 
-			pGlobDesc->nReplaced = 1;
-			pGlobDesc->pValue = to->pValue;
+			pGlobDesc1->nReplaced = 1;
+			pGlobDesc1->pValue = to->pValue;
 		}
 		else
 		{
@@ -235,29 +185,10 @@ Variant VirtualMachine::FromBytes()
 		}
 		else if (var.usType == VarType::ARR)
 		{
-			unsigned int length = var.nLength;
-			Variant* pArr = VirtualMachine::HeapAlloc(length);
-			Variant* pLocalDesc = (Variant*)pArr->pValue;
-
-			while (pLocalDesc->pValue)
-			{
-				const unsigned int capacity = pLocalDesc->nCap;
-				const Variant* pStop = pLocalDesc + capacity;
-				for (Variant* p = pLocalDesc + 1; p <= pStop; ++p)
-				{
-					*p = FromBytes();
-				}
-				pLocalDesc = (Variant*)pLocalDesc->pValue;
-				length -= capacity;
-			}
-
-			const Variant* pStop = pLocalDesc + length;
-			for (Variant* p = pLocalDesc + 1; p <= pStop; ++p)
-			{
-				*p = FromBytes();
-			}
-
+			Variant* pArr = VirtualMachine::HeapAlloc(var.nLength);
 			var.pValue = pArr;
+			auto f = [this](Variant* elem) { *elem = FromBytes(); };
+			var.ForEach(f);
 		}
 		else if (var.usType == VarType::DICT)
 		{

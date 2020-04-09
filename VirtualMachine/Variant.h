@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <functional>
 
 using std::string;
 using std::exception;
@@ -136,6 +137,93 @@ struct Variant
 		return p + 1 + index;
 	}
 
+	inline void ForEach(std::function<void(Variant*)> f)
+	{
+		Variant* pGlobalDesc = (Variant*)pValue;
+		Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
+		Variant* pArr = pLocalDesc + 1;
+		Variant* pStop = pArr + pLocalDesc->nCap;
+
+		for (unsigned int i = 0; i < nLength; ++i, ++pArr)
+		{
+			if (pArr == pStop)
+			{
+				pLocalDesc = (Variant*)pLocalDesc->pValue;
+				pArr = pLocalDesc + 1;
+				pStop = pArr + pLocalDesc->nCap;
+			}
+
+			f(pArr);
+		}
+	}
+	
+	static inline void ForEach2(Variant* var1, Variant* var2, std::function<void(Variant*, Variant*)> f)
+	{
+		Variant* pGlobalDesc1 = (Variant*)var1->pValue;
+		Variant* pGlobalDesc2 = (Variant*)var2->pValue;
+		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
+		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
+		Variant* pArr1 = pLocalDesc1 + 1;
+		Variant* pArr2 = pLocalDesc2 + 1;
+		Variant* stop1 = pArr1 + pLocalDesc1->nCap;
+		Variant* stop2 = pArr2 + pLocalDesc2->nCap;
+		const unsigned int count = var1->nLength;
+
+		for (unsigned int i = 0; i < count; ++i, ++pArr1, ++pArr2)
+		{
+			if (pArr1 == stop1)
+			{
+				pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
+				pArr1 = pLocalDesc1 + 1;
+				stop1 = pArr1 + pLocalDesc1->nCap;
+			}
+
+			if (pArr2 == stop2)
+			{
+				pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+				pArr2 = pLocalDesc2 + 1;
+				stop2 = pArr2 + pLocalDesc2->nCap;
+			}
+
+			f(pArr1, pArr2);
+		}
+	}
+
+	inline void ForEachBucket(std::function<void(Variant*)> f)
+	{
+		Variant* pGlobalDesc = (Variant*)pValue;
+		Variant* pLocalDesc = (Variant*)pGlobalDesc->pValue;
+		Variant* pArr = pLocalDesc + 1;
+		Variant* pStop = pArr + pLocalDesc->nCap;
+		Variant* pBucket;
+		unsigned int len = nLength;
+
+		while (true)
+		{
+			for (; pArr < pStop; ++pArr)
+			{
+				if (pArr->pValue)
+				{
+					pBucket = (Variant*)pArr->pValue;
+					while (pBucket)
+					{
+						f(pBucket);
+
+						pBucket = (Variant*)(pBucket + NEXT)->pValue;
+						if (--len == 0)
+						{
+							return;
+						}
+					}
+				}
+			}
+
+			pLocalDesc = (Variant*)pLocalDesc->pValue;
+			pArr = pLocalDesc + 1;
+			pStop = pArr + pLocalDesc->nCap;
+		}
+	}
+
 	inline void PushBack(Variant* pLocalDesc)
 	{
 		Variant* pGlobalDesc = (Variant*)pValue;
@@ -231,7 +319,7 @@ struct Variant
 		pGlobalDesc->nCap += cap;
 	}
 
-	const unsigned long GetHash() const;
+	const unsigned long GetHash();
 
 	inline void PopBack() noexcept
 	{
@@ -361,60 +449,36 @@ struct Variant
 		return Variant(pGlobalDesc2, nLength, VarType::ARR);
 	}
 
-	inline void DictToArr(Variant* pGlobalDesc2) const
+	inline void DictToArr(Variant* pGlobalDesc2)
 	{
 		static const unsigned short doubVariantSize = sizeof(Variant) << 1;
 
 		Variant* pGlobalDesc1 = (Variant*)pValue;
-		Variant* pLocalDesc1 = (Variant*)pGlobalDesc1->pValue;
 		Variant* pLocalDesc2 = (Variant*)pGlobalDesc2->pValue;
-		Variant* pArr1 = pLocalDesc1 + 1;
 		Variant* pArr2 = pLocalDesc2 + 1;
-		Variant* stop1 = pArr1 + pLocalDesc1->nCap;
 		Variant* stop2 = pArr2 + pLocalDesc2->nCap;
-		Variant* bucket;
-		unsigned int len = nLength;
 
-		while (true)
+		auto f = [&](Variant* elem)
 		{
-			for (; pArr1 <= stop1; ++pArr1)
+			if (pArr2 == stop2)
 			{
-				if (pArr1->pValue)
-				{
-					bucket = (Variant*)pArr1->pValue;
-					while (bucket)
-					{
-						*pArr2++ = *(bucket + KEY);
-						if (pArr2 == stop2)
-						{
-							pLocalDesc2 = (Variant*)pLocalDesc1->pValue;
-							pArr2 = pLocalDesc2 + 1;
-							stop2 = pArr2 + pLocalDesc2->nCap;
-						}
-
-						*pArr2++ = *(bucket + VALUE);
-
-						if (--len == 0)
-						{
-							return;
-						}
-						
-						if (pArr2 == stop2)
-						{
-							pLocalDesc2 = (Variant*)pLocalDesc1->pValue;
-							pArr2 = pLocalDesc2 + 1;
-							stop2 = pArr2 + pLocalDesc2->nCap;
-						}
-
-						bucket = (Variant*)(bucket + NEXT)->pValue;
-					}
-				}
+				pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+				pArr2 = pLocalDesc2 + 1;
+				stop2 = pArr2 + pLocalDesc2->nCap;
 			}
 
-			pLocalDesc1 = (Variant*)pLocalDesc1->pValue;
-			pArr1 = pLocalDesc1 + 1;
-			stop1 = pArr1 + pLocalDesc1->nCap;
-		}
+			*pArr2++ = *(elem + KEY);
+			if (pArr2 == stop2)
+			{
+				pLocalDesc2 = (Variant*)pLocalDesc2->pValue;
+				pArr2 = pLocalDesc2 + 1;
+				stop2 = pArr2 + pLocalDesc2->nCap;
+			}
+
+			*pArr2++ = *(elem + VALUE);
+		};
+
+		ForEachBucket(f);
 	}
 
 	inline bool Contains(Variant* key) const
@@ -442,7 +506,7 @@ struct Variant
 		return false;
 	}
 
-	const string ToString() const;
+	const string ToString();
 
 	inline static string TypeToString(VarType type)
 	{

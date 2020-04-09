@@ -427,7 +427,6 @@ private:
 	inline void HeapCollect();
 	inline void CheckReferences(Variant* from, Variant* to);
 	void HeapMove(Variant* from, Variant* to);
-	inline void DictEntryMove(Variant* from, Variant* to, Variant** newBucket);
 
 	Variant FromBytes();
 
