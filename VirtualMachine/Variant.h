@@ -125,6 +125,14 @@ struct Variant
 		}
 	}
 
+	inline void CheckBounds(const unsigned int pos) const
+	{
+		if (pos >= nLength)
+		{
+			throw ex_outOfBounds(pos);
+		}
+	}
+
 	inline Variant* Get(const unsigned int i) const
 	{
 		Variant* p = (Variant*)((Variant*)pValue)->pValue;
@@ -504,6 +512,40 @@ struct Variant
 		}
 
 		return false;
+	}
+
+	inline long Match(Variant* varstr) const
+	{
+		CheckType(VarType::STR);
+
+		const unsigned int substrlen = varstr->nLength;
+		CheckBounds(substrlen);
+
+		char* str = (char*)pValue;
+		char* substr = (char*)varstr->pValue;
+		char* strstop = str + (nLength - substrlen + 1);
+		char* substrstop = substr + substrlen;
+
+		for (char* it1 = str; it1 < strstop; ++it1)
+		{
+			bool bSuccess = true;
+
+			for (char* it2 = substr, *it3 = it1; it2 < substrstop; ++it2, ++it3)
+			{
+				if (*it3 != *it2)
+				{
+					bSuccess = false;
+					break;
+				}
+			}
+
+			if (bSuccess)
+			{
+				return it1 - str;
+			}
+		}
+
+		return -1;
 	}
 
 	const string ToString();

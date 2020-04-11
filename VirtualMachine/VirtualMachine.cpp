@@ -347,10 +347,7 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 				Variant* arr = m_pStack + m_nCapacity - offset;
-				if (index >= arr->nLength)
-				{
-					throw Variant::ex_outOfBounds(index);
-				}
+				arr->CheckBounds(index);
 				Variant* var = arr->Get(index);
 				var->Copy();
 				*m_sp = *var;
@@ -380,10 +377,7 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 				Variant* arr = m_pStack + m_nCapacity - offset;
-				if (index >= arr->nLength)
-				{
-					throw Variant::ex_outOfBounds(index);
-				}
+				arr->CheckBounds(index);
 				*(arr->Get(index)) = *(m_sp++);
 
 #ifdef _DEBUG
@@ -1315,10 +1309,7 @@ void VirtualMachine::Run(byte* program)
 
 				Variant* str = m_pStack + m_nCapacity - offset;
 
-				if (index >= str->nLength)
-				{
-					throw Variant::ex_outOfBounds(index);
-				}
+				str->CheckBounds(index);
 				str->CheckType(VarType::STR);
 
 				char* chr = new char[1 + sizeof(unsigned int)];
@@ -1354,10 +1345,7 @@ void VirtualMachine::Run(byte* program)
 #endif
 
 				Variant* str = m_pStack + m_nCapacity - offset;
-				if (index >= str->nLength)
-				{
-					throw Variant::ex_outOfBounds(index);
-				}
+				str->CheckBounds(index);
 				*((char*)str->pValue + index) = *((char*)m_sp->pValue);
 				(m_sp++)->Free();
 
@@ -1400,6 +1388,65 @@ void VirtualMachine::Run(byte* program)
 				double num = strtod(str, &strEnd);
 				m_sp->Free();
 				*m_sp = Variant(num);
+			}
+			break;
+			case SMATCH:
+			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
+				m_sp->CheckType(VarType::STR);
+
+#ifdef _DEBUG
+				Log("SMATCH " + std::to_string(offset) + " " + m_sp->ToString());
+				
+				clock_t tStart = clock();
+#endif
+
+				Variant* str = m_pStack + m_nCapacity - offset;
+				const long res = str->Match(m_sp);
+				m_sp->Free();
+				*m_sp = Variant((double)res);
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case SUBS:
+			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+				const unsigned int start = (unsigned int)(m_sp++)->dValue;
+
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+				const unsigned int end = (unsigned int)(m_sp)->dValue;
+
+#ifdef _DEBUG
+				Log("SUBS " + std::to_string(offset) + " " + std::to_string(start) + " " + std::to_string(end));
+#endif
+
+				Variant* str = m_pStack + m_nCapacity - offset;
+
+				str->CheckType(VarType::STR);
+				str->CheckBounds(start);
+				str->CheckBounds(end);
+
+				const unsigned int len = end - start;
+				char* substr = new char[sizeof(unsigned int) + len];
+				*(unsigned int*)substr = 1;
+				substr += sizeof(unsigned int);
+				memcpy(substr, (char*)str->pValue + start, len);
+				*m_sp = Variant(substr, len);
 			}
 			break;
 			default:

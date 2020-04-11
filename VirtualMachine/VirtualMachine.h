@@ -70,6 +70,8 @@ enum ByteCommand : byte
 	SSTORE,
 	NTOS,
 	STON,
+	SMATCH,
+	SUBS,
 };
 
 class VirtualMachine

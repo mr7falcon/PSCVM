@@ -68,7 +68,9 @@ namespace Compiler
             SFETCH,
             SSTORE,
             NTOS,
-            STON
+            STON,
+            SMATCH,
+            SUBS,
         };
 
         public enum VarType : ushort
@@ -504,6 +506,14 @@ namespace Compiler
                         break;
                     case "STON":
                         AddByte((byte)ByteCommand.STON);
+                        break;
+                    case "SMATCH":
+                        AddByte((byte)ByteCommand.SMATCH);
+                        AddInt();
+                        break;
+                    case "SUBS":
+                        AddByte((byte)ByteCommand.SUBS);
+                        AddInt();
                         break;
                     default:
                         if (command[command.Length - 1] == ':')
