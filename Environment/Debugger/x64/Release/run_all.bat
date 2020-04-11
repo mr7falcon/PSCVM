@@ -30,3 +30,7 @@ Debugger.exe -v ../../../Tests/Byte/shl.bpsc
 Debugger.exe -v ../../../Tests/Byte/len.bpsc
 Debugger.exe -v ../../../Tests/Byte/darr.bpsc
 Debugger.exe -v ../../../Tests/Byte/dcont.bpsc
+Debugger.exe -v ../../../Tests/Byte/sfetch.bpsc
+Debugger.exe -v ../../../Tests/Byte/sstore.bpsc
+Debugger.exe -v ../../../Tests/Byte/ntos.bpsc
+Debugger.exe -v ../../../Tests/Byte/ston.bpsc

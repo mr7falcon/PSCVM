@@ -1295,6 +1295,113 @@ void VirtualMachine::Run(byte* program)
 #endif
 			}
 			break;
+			case SFETCH:
+			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+
+				const unsigned int index = (unsigned int)m_sp->dValue;
+
+#ifdef _DEBUG
+				Log("SFETCH " + std::to_string(offset) + " " + std::to_string(index));
+
+				const clock_t tStart = clock();
+#endif
+
+				Variant* str = m_pStack + m_nCapacity - offset;
+
+				if (index >= str->nLength)
+				{
+					throw Variant::ex_outOfBounds(index);
+				}
+				str->CheckType(VarType::STR);
+
+				char* chr = new char[1 + sizeof(unsigned int)];
+				*(unsigned int*)chr = 1;
+				chr += sizeof(unsigned int);
+				*chr = *((char*)str->pValue + index);
+				*m_sp = Variant(chr, 1);
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case SSTORE:
+			{
+				const int offset = *((int*)m_pc);
+				m_pc += sizeof(int);
+
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+
+				const unsigned int index = (unsigned int)(m_sp++)->dValue;
+
+				m_sp->CheckType(VarType::STR);
+
+#ifdef _DEBUG
+				Log("SSTORE " + m_sp->ToString() + " " + std::to_string(offset) + " " + std::to_string(index));
+
+				const clock_t tStart = clock();
+#endif
+
+				Variant* str = m_pStack + m_nCapacity - offset;
+				if (index >= str->nLength)
+				{
+					throw Variant::ex_outOfBounds(index);
+				}
+				*((char*)str->pValue + index) = *((char*)m_sp->pValue);
+				(m_sp++)->Free();
+
+#ifdef _DEBUG
+				const clock_t tEnd = clock();
+				LogTime(tEnd - tStart);
+#endif
+			}
+			break;
+			case NTOS:
+			{
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+
+#ifdef _DEBUG
+				Log("NTOS " + m_sp->ToString());
+#endif
+
+				const double num = m_sp->dValue;
+				const unsigned int len = _scprintf("%f", num);
+				char* str = new char[len + sizeof(unsigned int)];
+				*(unsigned int*)str = 1;
+				str += sizeof(unsigned int);
+				sprintf_s(str, len + 1, "%f", num);
+				*m_sp = Variant(str, len);
+			}
+			break;
+			case STON:
+			{
+				m_sp->CheckType(VarType::STR);
+
+#ifdef _DEBUG
+				Log("STON " + m_sp->ToString());
+#endif
+
+				char* str = (char*)m_sp->pValue;
+				char* strEnd = str + m_sp->nLength;
+				double num = strtod(str, &strEnd);
+				m_sp->Free();
+				*m_sp = Variant(num);
+			}
+			break;
 			default:
 			{
 				return;

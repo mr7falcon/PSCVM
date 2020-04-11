@@ -66,6 +66,10 @@ enum ByteCommand : byte
 	LEN,
 	DARR,
 	DCONT,
+	SFETCH,
+	SSTORE,
+	NTOS,
+	STON,
 };
 
 class VirtualMachine

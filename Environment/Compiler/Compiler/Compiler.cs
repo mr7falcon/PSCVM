@@ -65,6 +65,10 @@ namespace Compiler
             LEN,
             DARR,
             DCONT,
+            SFETCH,
+            SSTORE,
+            NTOS,
+            STON
         };
 
         public enum VarType : ushort
@@ -139,10 +143,11 @@ namespace Compiler
             {
                 string op = "";
                 op += program[i++];
-                while (Char.IsDigit(program[i]) || program[i] == ',')
+                while (Char.IsDigit(program[i]) || program[i] == '.' || program[i] == ',')
                 {
                     op += program[i++];
                 }
+                op = op.Replace('.', ',');
                 bts = BitConverter.GetBytes(double.Parse(op));
             }
             else if (program[i] == '\'' || program[i] == '\"')
@@ -485,6 +490,20 @@ namespace Compiler
                     case "DCONT":
                         AddByte((byte)ByteCommand.DCONT);
                         AddInt();
+                        break;
+                    case "SFETCH":
+                        AddByte((byte)ByteCommand.SFETCH);
+                        AddInt();
+                        break;
+                    case "SSTORE":
+                        AddByte((byte)ByteCommand.SSTORE);
+                        AddInt();
+                        break;
+                    case "NTOS":
+                        AddByte((byte)ByteCommand.NTOS);
+                        break;
+                    case "STON":
+                        AddByte((byte)ByteCommand.STON);
                         break;
                     default:
                         if (command[command.Length - 1] == ':')
