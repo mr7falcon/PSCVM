@@ -1542,52 +1542,52 @@ extern "C"
 		return num;
 	}
 
-	__declspec(dllexport) void __stdcall StrRun0(byte* program, char* res)
+	__declspec(dllexport) int __stdcall StrRun0(byte* program, char* res)
 	{
 		VirtualMachine vm;
 		vm.Run(program);
 		Variant var = vm.Return();
 		memcpy(res, var.pValue, var.nLength);
-		*(res + var.nLength) = '\0';
+		return var.nLength;
 	}
 
-	__declspec(dllexport) void __stdcall StrRun1(byte* program, char* res, byte* arg0)
+	__declspec(dllexport) int __stdcall StrRun1(byte* program, char* res, byte* arg0)
 	{
 		VirtualMachine vm;
 		vm.ProvideArgs(arg0);
 		vm.Run(program);
 		Variant var = vm.Return();
 		memcpy(res, var.pValue, var.nLength);
-		*(res + var.nLength) = '\0';
+		return var.nLength;
 	}
 
-	__declspec(dllexport) void __stdcall StrRun2(byte* program, char* res, byte* arg0, byte* arg1)
+	__declspec(dllexport) int __stdcall StrRun2(byte* program, char* res, byte* arg0, byte* arg1)
 	{
 		VirtualMachine vm;
 		vm.ProvideArgs(arg0, arg1);
 		vm.Run(program);
 		Variant var = vm.Return();
 		memcpy(res, var.pValue, var.nLength);
-		*(res + var.nLength) = '\0';
+		return var.nLength;
 	}
 
-	__declspec(dllexport) void __stdcall StrRun3(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2)
+	__declspec(dllexport) int __stdcall StrRun3(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2)
 	{
 		VirtualMachine vm;
 		vm.ProvideArgs(arg0, arg1, arg2);
 		vm.Run(program);
 		Variant var = vm.Return();
 		memcpy(res, var.pValue, var.nLength);
-		*(res + var.nLength) = '\0';
+		return var.nLength;
 	}
 
-	__declspec(dllexport) void __stdcall StrRun4(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
+	__declspec(dllexport) int __stdcall StrRun4(byte* program, char* res, byte* arg0, byte* arg1, byte* arg2, byte* arg3)
 	{
 		VirtualMachine vm;
 		vm.ProvideArgs(arg0, arg1, arg2, arg3);
 		vm.Run(program);
 		Variant var = vm.Return();
 		memcpy(res, var.pValue, var.nLength);
-		*(res + var.nLength) = '\0';
+		return var.nLength;
 	}
 }

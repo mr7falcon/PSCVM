@@ -36,3 +36,5 @@ Debugger.exe -v ../../../Tests/Byte/ntos.bpsc
 Debugger.exe -v ../../../Tests/Byte/ston.bpsc
 Debugger.exe -v ../../../Tests/Byte/smatch.bpsc
 Debugger.exe -v ../../../Tests/Byte/subs.bpsc
+Debugger.exe -n ../../../Tests/Byte/nret.bpsc
+Debugger.exe -s ../../../Tests/Byte/sret.bpsc

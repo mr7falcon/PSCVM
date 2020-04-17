@@ -10,8 +10,11 @@ VirtualMachine/x64
 *.vcxproj
 *.user
 Environment/Compiler/Compiler/obj
-CLRVM/CLRVM/bin
-CLRVM/CLRVM/obj
+SqlProc/SqlProc/bin
+SqlProc/SqlProc/obj
+*.dbmdl
+*.jfm
+*.sqlproj
 Environment/Debugger/Debugger/log.log
 *.docx
 *.png
