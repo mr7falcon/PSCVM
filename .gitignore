@@ -10,6 +10,7 @@ VirtualMachine/x64
 *.vcxproj
 *.user
 Environment/Compiler/Compiler/obj
+Environment/Compiler/Compiler/bin
 SqlProc/SqlProc/bin
 SqlProc/SqlProc/obj
 *.dbmdl
@@ -31,3 +32,8 @@ x64/Release/
 Environment/Debugger/Debugger/x64/
 Environment/Debugger/x64/Debug/
 *.ilk
+Environment/Compiler/Lib/Lib/obj
+Environment/Compiler/Lib/Lib/bin
+Environment/Compiler/Lib/Lib/Properties
+Environment/Compiler/SqlCompiler/SqlCompiler/bin
+Environment/Compiler/SqlCompiler/SqlCompiler/obj
