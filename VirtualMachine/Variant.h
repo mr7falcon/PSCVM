@@ -514,6 +514,18 @@ struct Variant
 		return false;
 	}
 
+	static inline bool SuffMatch(char* str, const unsigned int strlen, const unsigned int offset, const unsigned int sufflen)
+	{
+		return offset > sufflen ?
+			str[offset - sufflen - 1] != str[strlen - sufflen - 1] && memcmp(str + strlen - sufflen, str + offset - sufflen, sufflen) == 0 :
+			memcmp(str + strlen - offset, str, offset) == 0;
+	}
+
+	static inline unsigned int Max(const unsigned int a, const unsigned int b) noexcept
+	{
+		return a > b ? a : b;
+	}
+
 	inline long Match(Variant* varstr) const
 	{
 		CheckType(VarType::STR);
@@ -521,29 +533,53 @@ struct Variant
 		const unsigned int substrlen = varstr->nLength;
 		CheckBounds(substrlen);
 
+		unsigned int* suffTable = new unsigned int[substrlen];
+		constexpr unsigned int alphSize = UCHAR_MAX + 1;
+		long stopTable[alphSize];
+
 		char* str = (char*)pValue;
 		char* substr = (char*)varstr->pValue;
-		char* strstop = str + (nLength - substrlen + 1);
-		char* substrstop = substr + substrlen;
-
-		for (char* it1 = str; it1 < strstop; ++it1)
+		
+		const long* stopTableEnd = stopTable + alphSize;
+		for (long* i = stopTable; i < stopTableEnd; ++i)
 		{
-			bool bSuccess = true;
-
-			for (char* it2 = substr, *it3 = it1; it2 < substrstop; ++it2, ++it3)
-			{
-				if (*it3 != *it2)
-				{
-					bSuccess = false;
-					break;
-				}
-			}
-
-			if (bSuccess)
-			{
-				return it1 - str;
-			}
+			*i = -1;
 		}
+
+		for (unsigned int i = 0; i < substrlen - 1; ++i)
+		{
+			stopTable[substr[i]] = i;
+		}
+
+		for (unsigned int i = 0; i < substrlen; ++i)
+		{
+			unsigned int offset = substrlen;
+			while (offset > 0 && SuffMatch(substr, substrlen, offset, i))
+			{
+				--offset;
+			}
+			suffTable[substrlen - i - 1] = substrlen - offset;
+		}
+
+		for (unsigned int i = 0; i <= nLength - substrlen;)
+		{
+			unsigned int j = substrlen - 1;
+			char* a = substr + j;
+			char* b = str + j + i;
+			for ( ; *a == *b; --a, --b)
+			{
+				if (j == 0)
+				{
+					return i;
+				}
+
+				--j;
+			}
+
+			i += Max(suffTable[j], j - stopTable[*b]);
+		}
+
+		delete[](suffTable);
 
 		return -1;
 	}

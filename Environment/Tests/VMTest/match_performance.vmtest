@@ -1,0 +1,10 @@
+PUSH 'vlaurvuibravuberstringgnseurgbruthjjhoi5n'
+PUSH 'string'
+PUSH 1000001
+mark:
+FETCH 2
+SMATCH 1
+DEC 3
+FETCH 3
+JNZ mark
+HALT
