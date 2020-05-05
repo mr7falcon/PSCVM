@@ -1,0 +1,11 @@
+PUSH {'string1' | 'string2' | 'string3' | 'string4' | 'string5'}
+PUSH {'string1' | 'string2' | 'string3' | 'string4' | 'string5'}
+PUSH 1000001
+mark:
+FETCH 1
+FETCH 2
+EQ
+DEC 3
+FETCH 3
+JNZ mark
+HALT

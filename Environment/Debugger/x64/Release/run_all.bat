@@ -17,7 +17,6 @@ Debugger.exe -v ../../../Tests/Byte/jz.bpsc
 Debugger.exe -v ../../../Tests/Byte/local.bpsc
 Debugger.exe -v ../../../Tests/Byte/lt.bpsc
 Debugger.exe -v ../../../Tests/Byte/narg.bpsc 5
-Debugger.exe -v ../../../Tests/Byte/performance_test.bpsc
 Debugger.exe -v ../../../Tests/Byte/pop.bpsc
 Debugger.exe -v ../../../Tests/Byte/push.bpsc
 Debugger.exe -v ../../../Tests/Byte/ret.bpsc
@@ -38,3 +37,6 @@ Debugger.exe -v ../../../Tests/Byte/smatch.bpsc
 Debugger.exe -v ../../../Tests/Byte/subs.bpsc
 Debugger.exe -n ../../../Tests/Byte/nret.bpsc
 Debugger.exe -s ../../../Tests/Byte/sret.bpsc
+Debugger.exe -v ../../../Tests/Byte/insert_performance.bpsc
+Debugger.exe -v ../../../Tests/Byte/eq_performance.bpsc
+Debugger.exe -v ../../../Tests/Byte/match_performance.bpsc
