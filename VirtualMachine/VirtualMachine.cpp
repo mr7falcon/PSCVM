@@ -912,6 +912,18 @@ void VirtualMachine::Run(byte* program)
 				op1->dValue = (long)op1->dValue & (long)op2->dValue;
 			}
 			break;
+			case ByteCommand::INV:
+			{
+#ifdef _DEBUG
+				Log("INV " + m_sp->ToString());
+#endif
+				if (m_sp->usNull == Variant::c_null)
+				{
+					throw Variant::ex_wrongType((VarType)m_sp->usType);
+				}
+				m_sp->dValue = ~(long)m_sp->dValue;
+			}
+			break;
 			case ByteCommand::SHL:
 			{
 				Variant* op2 = m_sp++;

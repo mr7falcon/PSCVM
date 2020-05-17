@@ -72,6 +72,7 @@ enum ByteCommand : byte
 	STON,
 	SMATCH,
 	SUBS,
+	INV
 };
 
 class VirtualMachine

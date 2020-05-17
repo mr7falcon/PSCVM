@@ -70,6 +70,7 @@ namespace CompilerDll
             STON,
             SMATCH,
             SUBS,
+            INV
         };
 
         public enum VarType : ushort
@@ -360,6 +361,9 @@ namespace CompilerDll
                         break;
                     case "BAND":
                         AddByte((byte)ByteCommand.BAND);
+                        break;
+                    case "INV":
+                        AddByte((byte)ByteCommand.INV);
                         break;
                     case "NOT":
                         AddByte((byte)ByteCommand.NOT);
