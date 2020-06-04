@@ -118,6 +118,7 @@ public:
 #endif
 	}
 
+	//Деструктор виртуальной машины. Очищает используемую память
 	inline ~VirtualMachine()
 	{
 		for (Variant* iter = m_pStack; iter <= m_bp; ++iter)
@@ -166,6 +167,11 @@ public:
 #endif
 	}
 
+	//Функция выделения памяти под массив в куче
+	//Аргументы
+	//count - количество элементов массива
+	//local - не добавлять глобальный дескриптор
+	//Возвращаемое значение - указатель на первый элемент в куче
 	inline Variant* HeapAlloc(const unsigned int count, bool local = false)
 	{
 		Variant* pGlobalDesc = m_pCurrentSlot;
@@ -279,6 +285,10 @@ public:
 		return pGlobalDesc;
 	}
 
+	//Функция выделения памяти под массив структур в куче
+	//Аргументы
+	//count - количество элементов массива
+	//Возвращаемое значение - указатель на первый элемент в куче
 	inline Variant* HeapAllocStructArr(const unsigned int count)
 	{
 		Variant* pGlobalDesc = m_pCurrentSlot;
@@ -368,6 +378,8 @@ public:
 		return pGlobalDesc;
 	}
 
+	//Функция выделения памяти под структуру в куче
+	//Возвращаемое значение - указатель на элемент в куче
 	inline Variant* HeapAllocStruct()
 	{
 		const unsigned short nChunkRemain = (unsigned short)(m_pCurrentChunk->vData + c_nChunkSize - m_pCurrentSlot);
@@ -413,8 +425,18 @@ public:
 		return p;
 	}
 
+	//Функция запуска исполнения байт-кода
+	//Аргументы
+	//program - указатель на массив байт байт-кода
 	inline void Run(byte* program);
+
+	//Функция возврата элемента с вершины стека данных
+	//Возвращаемое значение - элемент типа Variant
 	inline Variant Return() { return *m_sp; }
+
+	//Функция получения аргументов программы
+	//Аргументы
+	//arg0-arg3 - аргументы программы в виде массива байт
 	inline void ProvideArgs(byte* arg0 = nullptr, byte* arg1 = nullptr, byte* arg2 = nullptr, byte* arg3 = nullptr)
 	{
 		m_bArgs[0] = arg0;
@@ -429,12 +451,26 @@ private:
 	static const unsigned short c_nChunkCapacity = 510;
 	static const unsigned short c_nChunkSizeStruct = 170;
 
+	//Функция увеличения размера стека
 	inline void Resize();
 
+	//Функция сборки мусора
 	inline void HeapCollect();
+
+	//Функция перераспределения ссылок на элементы кучи
+	//Аргументы
+	//from - указатель на элемент в "старой" куче
+	//to - указатель на элемент в "новой" куче
 	inline void CheckReferences(Variant* from, Variant* to);
+
+	//Функция переноса элемента из "старой" кучи в "новую"
+	//Аргументы
+	//from - указатель на элемент в "старой" куче
+	//to - указатель на элемент в "новой" куче
 	void HeapMove(Variant* from, Variant* to);
 
+	//Функция выделения элемента типа Variant из байт-кода
+	//Возвращаемое значение - элемент типа Variant
 	Variant FromBytes();
 
 	Variant* m_pStack;
@@ -448,6 +484,7 @@ private:
 		Variant vData[c_nChunkSize];
 		HeapChunk* pNext = nullptr;
 
+		//Дескриптор части кучи. Уменьшает счетчик ссылок у содержащихся элементов
 		inline ~HeapChunk();
 	};
 	HeapChunk* m_pFirstChunk;

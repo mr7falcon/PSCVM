@@ -93,6 +93,9 @@ struct Variant
 
 	inline ~Variant() {}
 
+	//Функция уменьшения счетчика ссылок элемента.
+	//В случае, если элемент хранит строку, и ее счетчик
+	//ссылок обнулился, память под нее очищается
 	inline void Free()
 	{
 		if (usNull == c_null && usType == VarType::STR)
@@ -105,6 +108,7 @@ struct Variant
 		}
 	}
 
+	//Функция увеличения счетчика ссылок элемента
 	inline void Copy()
 	{
 		if (usNull == c_null && usType == VarType::STR)
@@ -117,6 +121,10 @@ struct Variant
 		}
 	}
 
+	//Функция проверки типа элемента. В случае несовпадения
+	//генерирует исключение.
+	//Аргументы
+	//expected - ожидаемый тип
 	inline void CheckType(VarType expected) const
 	{
 		if (usNull != c_null || usType != expected)
@@ -133,6 +141,10 @@ struct Variant
 		}
 	}
 
+	//Функция получения элемента массива по индексу
+	//Аргументы
+	//i - индекс элемента в массиве
+	//Возвращаемое значение - указатель на элемент в куче
 	inline Variant* Get(const unsigned int i) const
 	{
 		Variant* p = (Variant*)((Variant*)pValue)->pValue;
@@ -145,6 +157,9 @@ struct Variant
 		return p + 1 + index;
 	}
 
+	//Функция для прохода по элементам массива
+	//Аргументы
+	//f - указатель на процедуру-обработчик
 	inline void ForEach(std::function<void(Variant*)> f)
 	{
 		Variant* pGlobalDesc = (Variant*)pValue;
@@ -165,6 +180,11 @@ struct Variant
 		}
 	}
 	
+	//Функция для симметричного прохода по элементам двух массивов
+	//Аргументы
+	//var1 - указатель на элемент первого массива
+	//var2 - указатель на элемент второго массива
+	//f - указатель на процедуру-обработчик
 	static inline void ForEach2(Variant* var1, Variant* var2, std::function<void(Variant*, Variant*)> f)
 	{
 		Variant* pGlobalDesc1 = (Variant*)var1->pValue;
@@ -197,6 +217,9 @@ struct Variant
 		}
 	}
 
+	//Функция для прохода по элементам словаря
+	//Аргументы
+	//f - указатель на процедуру-обработчик
 	inline void ForEachBucket(std::function<void(Variant*)> f)
 	{
 		Variant* pGlobalDesc = (Variant*)pValue;
@@ -232,6 +255,10 @@ struct Variant
 		}
 	}
 
+	//Функция добавления локального дескриптора в конец
+	//списка дескрипторов массива в куче
+	//Аргументы
+	//pLocalDesc - указатель на добавляемый локальный дескриптор
 	inline void PushBack(Variant* pLocalDesc)
 	{
 		Variant* pGlobalDesc = (Variant*)pValue;
@@ -243,6 +270,11 @@ struct Variant
 		p->pValue = pLocalDesc;
 	}
 
+	//Функция поиска ключа в словаре
+	//Аргументы
+	//key - указатель на ключ
+	//Возвращаемое значение - указатель на значение по ключу в массиве,
+	//если такой ключ существует. Иначе - генерируется исключение
 	inline Variant* Find(Variant* key) const
 	{
 		const unsigned int capacity = ((Variant*)pValue)->nCap;
@@ -263,6 +295,10 @@ struct Variant
 		throw ex_keyMissing(key);
 	}
 
+	//Функция вставки структуры ключ-значение в цепочку словаря
+	//Аргументы
+	//bucket - указатель на структуру ключ-значение
+	//entry - указатель на точку входа в цепочку словаря
 	inline void Insert(Variant* bucket, Variant* entry)
 	{
 		if (entry->pValue == nullptr)
@@ -278,6 +314,9 @@ struct Variant
 		}
 	}
 
+	//Функция увеличения вместимости словаря
+	//Аргументы
+	//pNewDesc - указатель на новый локальный дескриптор
 	inline void DictResize(Variant* pNewDesc)
 	{
 		PushBack(pNewDesc++);
@@ -327,6 +366,8 @@ struct Variant
 		pGlobalDesc->nCap += cap;
 	}
 
+	//Функция получения хэша элемента
+	//Возвращаемое значение - хэш элемента
 	const unsigned long GetHash();
 
 	inline void PopBack() noexcept
@@ -334,6 +375,9 @@ struct Variant
 		--nLength;
 	}
 
+	//Функция удаления элемента из словаря по ключу
+	//Аргументы
+	//key - указатель на ключ
 	void Erase(Variant* key)
 	{
 		const unsigned int cap = ((Variant*)pValue)->nCap;
@@ -359,6 +403,9 @@ struct Variant
 		throw ex_keyMissing(key);
 	}
 
+	//Функция конкатенации строк/массивов
+	//Аргументы
+	//op - указатель на присоединяемый элемент
 	inline void Concat(Variant* op)
 	{
 		if (usNull == c_null && op->usNull == c_null)
@@ -408,8 +455,16 @@ struct Variant
 		}
 	}
 
+	//Функция сравнения элементов
+	//Аргументы
+	//op1 - указатель первый элемент
+	//op2 - указатель на второй элемент
 	static bool Equal(Variant* op1, Variant* op2);
 	
+	//Функция дупликации массива в куче
+	//Аргументы
+	//pGlobalDesc2 - указатель на глобальный дескриптор
+	//нового массива
 	inline Variant Duplicate(Variant* pGlobalDesc2)
 	{
 		Variant* pGlobalDesc1 = (Variant*)pValue;
@@ -457,6 +512,9 @@ struct Variant
 		return Variant(pGlobalDesc2, nLength, VarType::ARR);
 	}
 
+	//Функция преобразования словаря в массив
+	//Аргументы
+	//pGlobalDesc2 - указатель на глобальный дескриптор нового массива
 	inline void DictToArr(Variant* pGlobalDesc2)
 	{
 		static const unsigned short doubVariantSize = sizeof(Variant) << 1;
@@ -489,6 +547,9 @@ struct Variant
 		ForEachBucket(f);
 	}
 
+	//Функция проверки содержания словарем элемента по ключу
+	//Аргументы
+	//key - указатель на ключ
 	inline bool Contains(Variant* key) const
 	{
 		if (usNull != c_null || usType != VarType::DICT)
@@ -514,6 +575,13 @@ struct Variant
 		return false;
 	}
 
+	//Функция проверки повторения суффикса в строке
+	//Аргументы
+	//str - указатель на строку
+	//strlen - длина строки
+	//offset - смещение поиска
+	//sufflen - длина суффикса
+	//Возвращаемое значение - переменная, сингализирующая о повторении суффикса
 	static inline bool SuffMatch(char* str, const unsigned int strlen, const unsigned int offset, const unsigned int sufflen)
 	{
 		return offset > sufflen ?
@@ -526,6 +594,11 @@ struct Variant
 		return a > b ? a : b;
 	}
 
+	//Функция поиска подстроки в строке
+	//Аргументы
+	//varstr - подстрока
+	//Возвращаемое значение - индекс подстроки в строке в случае
+	//ее нахождения, иначе - -1
 	inline long Match(Variant* varstr) const
 	{
 		CheckType(VarType::STR);
@@ -584,6 +657,8 @@ struct Variant
 		return -1;
 	}
 
+	//Функция преобразования элемента в строку
+	//Возвращаемое значение - результирующая строка
 	const string ToString();
 
 	inline static string TypeToString(VarType type)

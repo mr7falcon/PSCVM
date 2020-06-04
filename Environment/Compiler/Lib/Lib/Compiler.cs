@@ -103,6 +103,7 @@ namespace CompilerDll
             { }
         }
 
+        //Функция удаления пробельных символов
         private static void ClearSpaces()
         {
             while (program[i] == ' ' || program[i] == '\r' || program[i] == '\t' || program[i] == '\n')
@@ -111,6 +112,7 @@ namespace CompilerDll
             }
         }
 
+        //Функция разделения строки по разделителям
         private static string Split(params char[] separators)
         {
             string word = "";
@@ -135,6 +137,9 @@ namespace CompilerDll
             }
         }
 
+        //Функция преобразования элемента типа Variant в байт-код
+        //Аргументы
+        //cont - массив байт преобразованных элементов, являющихся частью массива/словаря
         private static void AddVar(List<byte[]> cont = null)
         {
             byte[] bts;
@@ -234,6 +239,7 @@ namespace CompilerDll
             }
         }
 
+        //Функция добавления 4-байтного целого числа к байт-коду
         private static void AddInt()
         {
             ClearSpaces();
@@ -242,11 +248,13 @@ namespace CompilerDll
             byteCode.AddRange(BitConverter.GetBytes(offset));
         }
 
+        //Функция добавления байта к байт-коду
         private static void AddByte(byte b)
         {
             byteCode.Add(b);
         }
 
+        //Функция создания метки
         private static void AddMark()
         {
             ClearSpaces();
@@ -268,6 +276,8 @@ namespace CompilerDll
             byteCode.AddRange(BitConverter.GetBytes((long)0));
         }
 
+        //Функция добавления смещений по меткам к байт-коду
+        //Возвращаемое значение - результирующий массив байт
         private static byte[] Linking()
         {
             byte[] bytes = byteCode.ToArray();
@@ -279,6 +289,10 @@ namespace CompilerDll
             return bytes;
         }
 
+        //Функция запуска компиляции исходного текста
+        //Аргументы
+        //code - строка с исходным текстом
+        //Возвращаемое значение - массив байт байт-кода
         public static byte[] Compile(string code)
         {
             i = 0;
